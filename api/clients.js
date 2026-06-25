@@ -16,9 +16,11 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
     const slug = await makeUniqueSlug(name);
+    // created_by stays NULL for now since there's no auth/login yet (single-tenant,
+    // no-auth mode). Once you add user accounts, pass the logged-in user's id here.
     const { rows } = await pool.query(
-      `INSERT INTO clients (name, email, phone, company, address, notes, slug)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO clients (name, email, phone, company, address, notes, slug, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NULL) RETURNING *`,
       [name, email || null, phone || null, company || null, address || null, notes || null, slug]
     );
     return res.status(201).json(rows[0]);
