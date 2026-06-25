@@ -1,0 +1,316 @@
+/* Calendar-specific styles */
+
+/* Center-align content in calendar elements */
+.page-header {
+  text-align: center;
+  justify-content: center;
+}
+
+.page-header h1,
+.page-header p {
+  text-align: center;
+}
+
+#event-count {
+  text-align: center;
+}
+
+/* Calendar header centered */
+.calendar-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-name {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.view-toggle button {
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid var(--gray-300);
+  background: white;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.view-toggle button:hover {
+  background: var(--gray-50);
+}
+
+.view-toggle button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Calendar grid layout */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--gray-200);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.calendar-day-header {
+  background: var(--gray-50);
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.calendar-day {
+  background: white;
+  min-height: 100px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.calendar-day.other-month {
+  background: var(--gray-50);
+  color: var(--gray-400);
+}
+
+.calendar-day-number {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gray-700);
+  margin-bottom: 4px;
+}
+
+/* Today highlight - highlighted box and date text */
+.calendar-day.today {
+  background: linear-gradient(135deg, var(--primary-light) 0%, #e0e7ff 100%);
+  border: 2px solid var(--primary);
+  position: relative;
+}
+
+.calendar-day.today .calendar-day-number {
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--primary);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Event items centered in calendar day */
+.calendar-event {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: center;
+}
+
+.calendar-event:hover {
+  filter: brightness(0.95);
+}
+
+.calendar-event.task,
+.badge.task {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.calendar-event.meeting,
+.badge.meeting {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.calendar-event.deadline,
+.badge.deadline {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Filters bar - horizontal alignment for dropdowns */
+.filters-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.filters-bar select {
+  min-width: 150px;
+}
+
+/* Event list centered */
+.event-list {
+  margin-top: 20px;
+}
+
+.event-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--gray-100);
+  align-items: flex-start;
+  transition: background 0.15s ease;
+  justify-content: center;
+}
+
+.event-item:hover {
+  background: var(--gray-50);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-date-box {
+  min-width: 60px;
+  text-align: center;
+  padding: 8px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+}
+
+.event-date-day {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  text-align: center;
+}
+
+.event-date-month {
+  font-size: 12px;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.event-details {
+  flex: 1;
+  text-align: center;
+}
+
+.event-title {
+  font-weight: 500;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.event-meta {
+  font-size: 12px;
+  color: var(--gray-500);
+  text-align: center;
+}
+
+/* Modal form centered labels and inputs */
+.modal-box label {
+  text-align: center;
+}
+
+.modal-box input,
+.modal-box select,
+.modal-box textarea {
+  text-align: center;
+}
+
+/* Field rows centered */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Past dates disabled style */
+.calendar-day.past {
+  background: var(--gray-100);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.calendar-day.past .calendar-day-number {
+  color: var(--gray-400);
+}
+
+.calendar-day.past .calendar-event {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .calendar-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .calendar-nav {
+    justify-content: center;
+  }
+  
+  .view-toggle {
+    justify-content: center;
+  }
+  
+  .calendar-grid {
+    font-size: 12px;
+  }
+  
+  .calendar-day {
+    min-height: 60px;
+    padding: 4px;
+  }
+  
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filters-bar select {
+    width: 100%;
+  }
+  
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}

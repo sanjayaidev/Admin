@@ -132,7 +132,14 @@ function renderMonthView() {
   const totalDays = lastDay.getDate();
   
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
   const isToday = (d) => d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  const isPast = (d) => {
+    const checkDate = new Date(d);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate < today;
+  };
   
   let html = '';
   
@@ -159,7 +166,8 @@ function renderMonthView() {
       return eventDateStr === dateStr;
     });
     
-    html += `<div class="calendar-day ${isToday(date) ? 'today' : ''}">`;
+    const pastClass = isPast(date) ? 'past' : '';
+    html += `<div class="calendar-day ${isToday(date) ? 'today' : ''} ${pastClass}">`;
     html += `<div class="calendar-day-number">${day}</div>`;
     
     dayEvents.slice(0, 4).forEach(event => {

@@ -1,0 +1,90 @@
+/* Clients-specific styles */
+
+/* Center-align content in client cards */
+.client-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.client-card-header {
+  width: 100%;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+
+.client-card h3 {
+  text-align: center;
+}
+
+.client-company {
+  text-align: center;
+}
+
+.client-info {
+  align-items: center;
+  width: 100%;
+}
+
+.client-info-item {
+  justify-content: center;
+}
+
+/* Client grid layout */
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  justify-items: center;
+}
+
+/* Modal form centered labels and inputs */
+.modal-box label {
+  text-align: center;
+}
+
+.modal-box input,
+.modal-box select,
+.modal-box textarea {
+  text-align: center;
+}
+
+/* Action buttons centered in card */
+.client-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-100);
+  justify-content: center;
+  width: 100%;
+}
+
+/* Page header centered */
+.page-header {
+  text-align: center;
+  justify-content: center;
+}
+
+.page-header h1,
+.page-header p {
+  text-align: center;
+}
+
+/* Client count centered */
+#client-count {
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .client-card {
+    max-width: 400px;
+    width: 100%;
+  }
+}
