@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · ClientPM</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <span class="brand">ClientPM</span>
+    <a href="/index.html" class="active">Dashboard</a>
+    <a href="/clients.html">Clients</a>
+    <a href="/tasks.html">Tasks</a>
+    <a href="/reminders.html">Reminders</a>
+  </nav>
+
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p>Overview of all projects and payments</p>
+      </div>
+    </div>
+
+    <!-- Date range filter bar -->
+    <div class="date-range-bar">
+      <div class="date-range-presets">
+        <button class="chip" data-range="all">All time</button>
+        <button class="chip" data-range="today">Today</button>
+        <button class="chip" data-range="week">This week</button>
+        <button class="chip" data-range="month">This month</button>
+      </div>
+      <div class="date-range-custom">
+        <label class="inline-label">From</label>
+        <input type="date" id="range-from" />
+        <label class="inline-label">To</label>
+        <input type="date" id="range-to" />
+        <button class="btn outline" id="apply-range" style="padding:6px 12px;">Apply</button>
+      </div>
+    </div>
+    <p id="range-summary" class="muted" style="margin: -4px 0 20px; font-size: 13px;"></p>
+
+    <div id="dashboard-content">Loading...</div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>
