@@ -2,26 +2,25 @@
 // Plain JavaScript. Depends on utils.js being loaded first (formatCurrency,
 // formatDate, isOverdue).
 
-let allItems = [];          // every task, unfiltered, loaded once from the API
-let activeRange = 'all';    // which preset chip is currently selected
-let customFrom = null;      // custom date range (used when chips are "all" is overridden by Apply)
+let dashboardData = null;
+let activeRange = 'all';
+let customFrom = null;
 let customTo = null;
 
 // ---- Load data once ----
 async function loadDashboard() {
-  const res = await fetch('/api/work-items');
-  allItems = await res.json();
+  const res = await fetch('/api/dashboard');
+  dashboardData = await res.json();
   setActiveChip('all');
   render();
 }
 
 // ---- Date range logic ----
-// Returns { from: Date|null, to: Date|null } for the currently selected range.
 function getCurrentRange() {
   if (customFrom || customTo) {
     return {
       from: customFrom ? new Date(customFrom) : null,
-      to: customTo ? new Date(customTo + 'T23:59:59') : null, // include the whole "to" day
+      to: customTo ? new Date(customTo + 'T23:59:59') : null,
     };
   }
 
@@ -35,7 +34,7 @@ function getCurrentRange() {
   }
   if (activeRange === 'week') {
     const start = startOfDay(now);
-    start.setDate(start.getDate() - start.getDay()); // back to Sunday
+    start.setDate(start.getDate() - start.getDay());
     const end = new Date(start); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59);
     return { from: start, to: end };
   }
@@ -44,15 +43,15 @@ function getCurrentRange() {
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); end.setHours(23, 59, 59);
     return { from: start, to: end };
   }
-  return { from: null, to: null }; // 'all'
+  return { from: null, to: null };
 }
 
 function itemsInRange() {
   const { from, to } = getCurrentRange();
-  if (!from && !to) return allItems; // "all time" — no filtering
+  if (!from && !to) return dashboardData.recent;
 
-  return allItems.filter(item => {
-    if (!item.due_date) return false; // tasks with no due date are excluded from a date-range view
+  return dashboardData.recent.filter(item => {
+    if (!item.due_date) return false;
     const due = new Date(item.due_date);
     if (from && due < from) return false;
     if (to && due > to) return false;
@@ -93,30 +92,23 @@ function render() {
   const items = itemsInRange();
   renderRangeSummary(items);
 
-  const stats = {
-    pending: items.filter(i => i.status === 'pending').length,
-    inProgress: items.filter(i => i.status === 'in-progress').length,
-    review: items.filter(i => i.status === 'review').length,
-    completed: items.filter(i => i.status === 'completed').length,
-    totalAmount: items.reduce((s, i) => s + Number(i.amount || 0), 0),
-    paid: items.filter(i => i.payment_status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0),
-    outstanding: items.filter(i => i.payment_status !== 'paid').reduce((s, i) => s + Number(i.amount || 0), 0),
-  };
+  const stats = dashboardData.byStatus;
+  const payments = dashboardData.payments;
 
-  const overdue = items.filter(isOverdue);
+  const overdue = dashboardData.overdue;
 
   document.getElementById('dashboard-content').innerHTML = `
     <div class="grid cols-4" style="margin-bottom: 24px;">
-      ${statCard('Pending', stats.pending)}
-      ${statCard('In Progress', stats.inProgress)}
-      ${statCard('In Review', stats.review)}
-      ${statCard('Completed', stats.completed)}
+      ${statCard('Pending', stats.pending || 0)}
+      ${statCard('In Progress', stats['in-progress'] || 0)}
+      ${statCard('In Review', stats.review || 0)}
+      ${statCard('Completed', stats.completed || 0)}
     </div>
 
     <div class="grid cols-3" style="margin-bottom: 24px;">
-      ${statCard('Total Billed', formatCurrency(stats.totalAmount))}
-      ${statCard('Collected', formatCurrency(stats.paid))}
-      ${statCard('Outstanding', formatCurrency(stats.outstanding))}
+      ${statCard('Total Billed', formatCurrency(payments.total))}
+      ${statCard('Collected', formatCurrency(payments.paid))}
+      ${statCard('Outstanding', formatCurrency(payments.outstanding))}
     </div>
 
     ${overdue.length > 0 ? `

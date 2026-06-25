@@ -1,59 +1,105 @@
-# ClientPM — Step 1: Clients (plain HTML + Node)
+# ClientPM
 
-No build step, no TypeScript, no framework. Every file does exactly what it
-looks like it does — open any file top to bottom and you'll understand it.
+Full-stack client project management app — plain HTML/CSS/JS frontend + Node API, no build step.
 
-## Structure
+## Features
 
-```
-public/              ← what the browser loads (plain HTML/CSS/JS)
-  index.html         ← (not built yet — step 2)
-  clients.html        the Clients page
-  tasks.html          ← (not built yet — step 2)
-  reminders.html      ← (not built yet — step 3)
-  css/style.css       one shared stylesheet for every page
-  js/clients.js       all the logic for the Clients page
+- **Dashboard** — task status cards, payment totals, overdue alerts, date range filtering
+- **Clients** — add/edit/delete with contact details; auto slug generation; share links
+- **Tasks** — full CRUD per client; filter by status, payment, client; payment tracking
+- **Calendar** — day/week/month views; link events to clients & tasks; client filter
+- **Share Link** — `/share/[slug]` public page: client filters tasks by date range + status, sees invoice-style payment summary
 
-api/                 ← serverless functions, one file = one API route
-  clients.js          GET /api/clients, POST /api/clients
-  clients/[id].js      PUT /api/clients/:id, DELETE /api/clients/:id
+## Setup
 
-lib/db.js            ← shared database connection + auto-table-creation
-```
+### 1. Install dependencies
 
-## How the database works
-
-You don't need to run any migration command. The first time any API route
-is called, `lib/db.js` runs `CREATE TABLE IF NOT EXISTS` for every table.
-If the tables already exist, nothing happens. If they don't, they get
-created automatically. This means: **connect Neon, deploy, done.**
-
-## Deploying
-
-1. Push this folder to GitHub.
-2. Import it into Vercel (vercel.com → New Project).
-3. In Vercel project settings → Environment Variables, add:
-   - `DATABASE_URL` = your Neon connection string (the one with `?sslmode=require`)
-4. Deploy. Vercel automatically:
-   - Serves everything in `public/` as static files
-   - Turns every file in `api/` into its own serverless endpoint
-5. Visit `/clients.html` — the Clients page will create its own tables on
-   first load and you can start adding clients immediately.
-
-## Running locally (optional)
-
-Vercel's local dev command handles both static files and API routes the
-same way production does:
-
-```
-npm install -g vercel
+```bash
 npm install
-vercel dev
 ```
 
-Then open `http://localhost:3000/clients.html`.
+### 2. Configure environment
 
-## What's next
+```bash
+cp .env.local.example .env.local
+# Edit .env.local and paste your Neon DATABASE_URL
+# Get it from console.neon.tech → your project → Connection Details (pooled string)
+```
 
-This is step 1 of the rebuild — Clients only, fully working end to end.
-Next steps (one at a time, same pattern): Tasks, Dashboard, Reminders.
+### 3. Run locally
+
+```bash
+npm run dev
+# → http://localhost:3000
+```
+
+The database tables are created automatically on first API call - no manual migration needed!
+
+## Deploy to Vercel
+
+1. Push repo to GitHub
+2. Import in vercel.com
+3. Add environment variable: `DATABASE_URL` = your Neon connection string
+4. Deploy — done!
+
+## Share Link
+
+Every client gets a public URL:
+
+```
+https://yourapp.vercel.app/share/[client-slug]
+```
+
+The client can:
+- Filter by date range
+- Filter by task status
+- See totals for paid/partial/unpaid amounts
+
+## Project Structure
+
+```
+public/              ← static HTML/CSS/JS files (served directly)
+  index.html         ← Dashboard page
+  clients.html       ← Clients management
+  tasks.html         ← Tasks management
+  calendar.html      ← Calendar view
+  share.html         ← Public client portal template
+  css/style.css      ← Shared stylesheet
+  js/
+    utils.js         ← Shared helpers (formatCurrency, formatDate, isOverdue)
+    dashboard.js     ← Dashboard logic
+    clients.js       ← Clients CRUD
+    tasks.js         ← Tasks CRUD
+    calendar.js      ← Calendar logic
+    share.js         ← Public portal logic
+
+lib/db.js            ← Database connection + auto table creation
+server.js            ← Unified router (all API endpoints + static file serving)
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/clients` | List all clients |
+| POST | `/api/clients` | Create client |
+| GET | `/api/clients/:id` | Get client by ID |
+| PUT | `/api/clients/:id` | Update client |
+| DELETE | `/api/clients/:id` | Delete client |
+| GET | `/api/work-items` | List tasks (with filters) |
+| POST | `/api/work-items` | Create task |
+| GET/PUT/DELETE | `/api/work-items/:id` | Task operations |
+| GET | `/api/calendar-events` | List events |
+| POST | `/api/calendar-events` | Create event |
+| GET/PUT/DELETE | `/api/calendar-events/:id` | Event operations |
+| GET | `/api/dashboard` | Dashboard stats |
+| GET | `/api/share/:slug` | Public client data |
+| GET | `/share/:slug` | Public client portal page |
+
+## Tech Stack
+
+- **Frontend**: Plain HTML, CSS, JavaScript (no framework, no build step)
+- **Backend**: Node.js with built-in `http` module
+- **Database**: PostgreSQL via Neon (serverless)
+- **ORM**: Raw SQL with `pg` driver
+- **Styling**: Tailwind-inspired custom CSS
