@@ -64,6 +64,25 @@ async function loadEvents() {
     allEvents = await res.json();
   }
   
+  // Add pending tasks as calendar events
+  const pendingTaskEvents = allTasks
+    .filter(task => task.status === 'pending')
+    .map(task => ({
+      id: `task-${task.id}`,
+      title: task.title,
+      description: task.description || '',
+      event_date: task.due_date ? new Date(task.due_date).toISOString() : new Date().toISOString(),
+      event_type: 'task',
+      work_item_id: task.id,
+      client_name: task.client_name,
+      isPendingTask: true
+    }));
+  
+  // Merge with existing events (avoid duplicates)
+  const existingWorkItemIds = new Set(allEvents.filter(e => !e.isPendingTask).map(e => e.work_item_id));
+  const uniquePendingEvents = pendingTaskEvents.filter(e => !existingWorkItemIds.has(e.work_item_id));
+  allEvents = [...allEvents, ...uniquePendingEvents];
+  
   render();
 }
 
@@ -131,19 +150,24 @@ function renderMonthView() {
   // Days of the month
   for (let day = 1; day <= totalDays; day++) {
     const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
     // Find events for this day
     const dayEvents = getFilteredEvents().filter(event => {
-      const eventDate = new Date(event.event_date).toISOString().split('T')[0];
-      return eventDate === dateStr;
+      const eventDate = new Date(event.event_date);
+      const eventDateStr = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth() + 1).padStart(2, '0')}-${String(eventDate.getUTCDate()).padStart(2, '0')}`;
+      return eventDateStr === dateStr;
     });
     
     html += `<div class="calendar-day ${isToday(date) ? 'today' : ''}">`;
     html += `<div class="calendar-day-number">${day}</div>`;
     
     dayEvents.slice(0, 4).forEach(event => {
-      html += `<div class="calendar-event ${event.event_type}" onclick="editEvent(${event.id})" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}</div>`;
+      if (event.isPendingTask) {
+        html += `<div class="calendar-event ${event.event_type}" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}</div>`;
+      } else {
+        html += `<div class="calendar-event ${event.event_type}" onclick="editEvent(${event.id})" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}</div>`;
+      }
     });
     
     if (dayEvents.length > 4) {
@@ -174,10 +198,15 @@ function renderWeekView() {
   
   let html = '';
   for (let d = new Date(startOfWeek); d <= endOfWeek; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const day = d.getDate();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
     const dayEvents = filtered.filter(event => {
-      const eventDate = new Date(event.event_date).toISOString().split('T')[0];
-      return eventDate === dateStr;
+      const eventDate = new Date(event.event_date);
+      const eventDateStr = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth() + 1).padStart(2, '0')}-${String(eventDate.getUTCDate()).padStart(2, '0')}`;
+      return eventDateStr === dateStr;
     });
     
     dayEvents.forEach(event => {
@@ -207,9 +236,9 @@ function renderEventList() {
 
 function eventItemHtml(event) {
   const date = new Date(event.event_date);
-  const day = date.getDate();
-  const month = date.toLocaleDateString('en-US', { month: 'short' });
-  const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const day = event.isPendingTask ? date.getUTCDate() : date.getDate();
+  const month = event.isPendingTask ? date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }) : date.toLocaleDateString('en-US', { month: 'short' });
+  const time = event.isPendingTask ? 'All day' : date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   
   return `
     <div class="event-item">
@@ -220,15 +249,17 @@ function eventItemHtml(event) {
       <div class="event-details">
         <div class="event-title">${escapeHtml(event.title)}</div>
         <div class="event-meta">
-          <span class="badge ${event.event_type}">${event.event_type}</span>
+          <span class="badge ${event.event_type}">${event.event_type}${event.isPendingTask ? ' (pending)' : ''}</span>
           ${time}
           ${event.work_item_title ? `· ${escapeHtml(event.work_item_title)}` : ''}
         </div>
         ${event.description ? `<p style="font-size:13px; color:#6b7280; margin-top:4px;">${escapeHtml(event.description)}</p>` : ''}
       </div>
       <div>
+        ${!event.isPendingTask ? `
         <button class="btn outline" style="padding:4px 8px; font-size:12px;" onclick="editEvent(${event.id})">Edit</button>
         <button class="btn danger" style="padding:4px 8px; font-size:12px;" onclick="openDeleteModal(${event.id})">Delete</button>
+        ` : ''}
       </div>
     </div>
   `;
@@ -327,10 +358,21 @@ async function saveEvent() {
     return;
   }
   
+  // Convert local datetime to UTC to avoid timezone shifts
+  const localDate = new Date(eventDate);
+  const utcDate = new Date(Date.UTC(
+    localDate.getFullYear(),
+    localDate.getMonth(),
+    localDate.getDate(),
+    localDate.getHours(),
+    localDate.getMinutes(),
+    localDate.getSeconds()
+  )).toISOString();
+  
   const data = {
     title: title,
     description: document.getElementById('f-description').value.trim(),
-    event_date: eventDate,
+    event_date: utcDate,
     event_type: document.getElementById('f-event-type').value,
     work_item_id: document.getElementById('f-work-item').value ? parseInt(document.getElementById('f-work-item').value) : null,
     user_id: 1 // Default user_id=1 for now (no auth)
