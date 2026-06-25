@@ -2,6 +2,8 @@
 // Single Node.js server serving static HTML/CSS/JS + API endpoints
 // No TypeScript, no framework — plain HTML/CSS/JS frontend
 
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
