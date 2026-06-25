@@ -1,0 +1,9 @@
+{
+  "name": "freelanceradmin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple client/task manager — plain HTML/JS frontend + Node API, no build step.",
+  "dependencies": {
+    "pg": "^8.11.5"
+  }
+}
