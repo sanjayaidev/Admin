@@ -1,0 +1,84 @@
+/* Dashboard-specific styles */
+
+/* Center-align content in stat cards and grid boxes */
+.stat-card,
+.card {
+  text-align: center;
+}
+
+.stat-card .stat-label,
+.stat-card .stat-value,
+.card .stat-label,
+.card .stat-value {
+  text-align: center;
+}
+
+/* Ensure grid layouts have centered content */
+.stats-grid .stat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Date range filter bar - horizontal alignment */
+.date-range-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.date-range-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.date-range-custom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.date-range-custom input[type="date"] {
+  width: auto;
+  padding: 8px 12px;
+}
+
+/* Range summary text centered */
+#range-summary {
+  text-align: center;
+}
+
+/* Dashboard content sections */
+.dashboard-section {
+  margin-bottom: 32px;
+}
+
+.dashboard-section h2 {
+  font-size: 1.125rem;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* Center table headers */
+table th {
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .date-range-presets {
+    justify-content: center;
+  }
+  
+  .date-range-custom {
+    justify-content: center;
+  }
+}
