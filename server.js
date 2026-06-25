@@ -13,6 +13,14 @@ const { pool, migrate, makeUniqueSlug } = require('./lib/db');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// Initialize database connection and run migrations on startup
+if (process.env.NODE_ENV === 'production') {
+  migrate().catch(err => {
+    console.error('Failed to run migrations:', err);
+    process.exit(1);
+  });
+}
+
 // MIME types for static files
 const MIME_TYPES = {
   '.html': 'text/html',

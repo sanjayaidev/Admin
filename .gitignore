@@ -1,3 +1,24 @@
 ```
+# Environment
+.env.local
+.env.local.example
+
+# Dependencies
 node_modules/
+
+# Compiled/build artifacts
+*.css
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```
