@@ -286,6 +286,14 @@ p {
   color: white;
 }
 
+/* For stat cards created dynamically in dashboard */
+.card .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1.2;
+}
+
 .stat-change {
   font-size: 13px;
   margin-top: 8px;
@@ -385,6 +393,17 @@ tbody tr:last-child td {
   color: var(--gray-600);
 }
 
+.muted-link {
+  color: var(--gray-500);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.2s ease;
+}
+
+.muted-link:hover {
+  color: var(--primary);
+}
+
 /* Priority badges */
 .priority-low {
   background: var(--gray-100);
@@ -406,6 +425,27 @@ tbody tr:last-child td {
   color: var(--danger);
 }
 
+/* Status badge classes for direct use */
+.badge.pending {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.badge.in-progress {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.badge.review {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge.completed {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
 /* Payment status badges */
 .payment-unpaid {
   background: var(--danger-bg);
@@ -418,6 +458,43 @@ tbody tr:last-child td {
 }
 
 .payment-paid {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* Priority badge classes for direct use */
+.badge.low {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.badge.medium {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.badge.high {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge.urgent {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Payment status badge classes for direct use */
+.badge.unpaid {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.badge.partial {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge.paid {
   background: var(--success-bg);
   color: var(--success);
 }
@@ -505,7 +582,8 @@ textarea {
   animation: fadeIn 0.2s ease;
 }
 
-.modal-overlay.active {
+.modal-overlay.active,
+.modal-overlay.open {
   display: flex;
 }
 
@@ -892,17 +970,20 @@ textarea {
   filter: brightness(0.95);
 }
 
-.calendar-event.task {
+.calendar-event.task,
+.badge.task {
   background: var(--info-bg);
   color: var(--info);
 }
 
-.calendar-event.meeting {
+.calendar-event.meeting,
+.badge.meeting {
   background: #ede9fe;
   color: #5b21b6;
 }
 
-.calendar-event.deadline {
+.calendar-event.deadline,
+.badge.deadline {
   background: var(--danger-bg);
   color: var(--danger);
 }
@@ -990,6 +1071,24 @@ textarea {
 .event-meta {
   font-size: 12px;
   color: var(--gray-500);
+}
+
+/* ===== Grid Layouts ===== */
+.grid {
+  display: grid;
+  gap: 20px;
+}
+
+.grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 /* ===== Client Card View ===== */
@@ -1152,6 +1251,12 @@ textarea {
   }
   
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 {
     grid-template-columns: 1fr;
   }
   
