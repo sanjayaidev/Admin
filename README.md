@@ -20,34 +20,40 @@ npm install
 
 ### 2. Configure environment
 
+Create a `.env` file with your DATABASE_URL:
+
 ```bash
-cp .env.local.example .env.local
-# Edit .env.local and paste your Neon DATABASE_URL
-# Get it from console.neon.tech → your project → Connection Details (pooled string)
+DATABASE_URL=postgresql://...
 ```
+
+Get the connection string from your PostgreSQL provider (Neon, Railway Postgres, etc.).
 
 ### 3. Run locally
 
 ```bash
-npm run dev
+npm start
 # → http://localhost:3000
 ```
 
 The database tables are created automatically on first API call - no manual migration needed!
 
-## Deploy to Vercel
+## Deploy to Railway
 
 1. Push repo to GitHub
-2. Import in vercel.com
-3. Add environment variable: `DATABASE_URL` = your Neon connection string
-4. Deploy — done!
+2. Create new project in railway.app
+3. Deploy from GitHub repository
+4. Add environment variable: `DATABASE_URL` = your PostgreSQL connection string
+   - Railway provides this automatically if you add a PostgreSQL database
+5. Deploy — done!
+
+Railway will automatically detect the Node.js app and use the `start` script.
 
 ## Share Link
 
 Every client gets a public URL:
 
 ```
-https://yourapp.vercel.app/share/[client-slug]
+https://yourapp.railway.app/share/[client-slug]
 ```
 
 The client can:

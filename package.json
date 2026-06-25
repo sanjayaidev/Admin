@@ -5,8 +5,10 @@
   "description": "Full-stack client project management app — plain HTML/JS frontend + Node API, no build step.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
