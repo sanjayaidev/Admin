@@ -9,70 +9,31 @@
   <link rel="stylesheet" href="/css/auh-modal.css">
 </head>
 <body>
-  <!-- Auth Modal -->
-  <div id="authModal" class="modal">
-    <div class="modal-content auth-modal">
-      <h2>Authentication Required</h2>
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" required>
-        </div>
-        <div class="form-group">
-          <label for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Login</button>
-      </form>
-      <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-      
-      <form id="signupForm" style="display: none;">
-        <div class="form-group">
-          <label for="signupName">Full Name</label>
-          <input type="text" id="signupName" required>
-        </div>
-        <div class="form-group">
-          <label for="signupEmail">Email</label>
-          <input type="email" id="signupEmail" required>
-        </div>
-        <div class="form-group">
-          <label for="signupPassword">Password</label>
-          <input type="password" id="signupPassword" required minlength="6">
-        </div>
-        <button type="submit" class="btn btn-primary">Sign Up</button>
-      </form>
-      <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Login</a></p>
-    </div>
-  </div>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <span class="brand">ClientPM</span>
+    <a href="/">Dashboard</a>
+    <a href="/clients.html">Clients</a>
+    <a href="/tasks.html">Tasks</a>
+    <a href="/calendar.html">Calendar</a>
+    <a href="/team.html" class="active">Team</a>
+    <a href="/settings.html">Settings</a>
+    <a href="/profile.html">Profile</a>
+  </nav>
 
-  <!-- Main Content -->
-  <div id="mainContent" style="display: none;">
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="nav-brand">ClientPM</div>
-      <div class="nav-links">
-        <a href="/">Dashboard</a>
-        <a href="/clients.html">Clients</a>
-        <a href="/tasks.html">Tasks</a>
-        <a href="/calendar.html">Calendar</a>
-        <a href="/invoices.html">Invoices</a>
-        <a href="/team.html" class="active">Team</a>
-        <a href="/settings.html">Settings</a>
-        <a href="/profile.html">Profile</a>
-        <button id="logoutBtn" class="btn btn-outline">Logout</button>
-      </div>
-    </nav>
-
-    <div class="container">
-      <div class="page-header">
+  <div class="page">
+    <div class="page-header">
+      <div>
         <h1>👥 Team Management</h1>
-        <button id="addMemberBtn" class="btn btn-primary" style="display: none;">+ Add Member</button>
+        <p id="team-count">Loading...</p>
       </div>
+      <button id="addMemberBtn" class="btn" style="display: none;">+ Add Member</button>
+    </div>
 
-      <!-- Admin-only notice -->
-      <div id="adminNotice" class="alert alert-warning" style="display: none;">
-        ⚠️ Only administrators can manage team members.
-      </div>
+    <!-- Admin-only notice -->
+    <div id="adminNotice" class="alert alert-warning" style="display: none; margin-bottom: 20px;">
+      ⚠️ Only administrators can manage team members.
+    </div>
 
       <!-- Team Stats -->
       <div class="stats-grid">
@@ -135,7 +96,6 @@
           <div class="loading-state">Loading workload data...</div>
         </div>
       </section>
-    </div>
   </div>
 
   <!-- Add/Edit Member Modal -->

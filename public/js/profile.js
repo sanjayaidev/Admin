@@ -15,13 +15,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const authResult = await window.checkAuth();
   
   if (!authResult.authenticated) {
-    // User is not authenticated, show modal and wait for login
-    showAuthModal();
+    // User is not authenticated, show the auth modal from auth.js
+    window.showAuthModal();
     return;
   }
   
   currentUser = authResult.user;
-  document.getElementById('mainContent').style.display = 'block';
   
   // Load profile data
   await loadProfileData();
@@ -32,32 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Setup event listeners
 function setupEventListeners() {
-  // Logout button
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.style.display = 'inline-block';
-    logoutBtn.addEventListener('click', handleLogout);
-  }
-  
-  // Auth form switching
-  document.getElementById('showSignup').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('signupForm').style.display = 'block';
-  });
-  
-  document.getElementById('showLogin').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('signupForm').style.display = 'none';
-    document.getElementById('loginForm').style.display = 'block';
-  });
-  
-  // Login form
-  document.getElementById('loginForm').addEventListener('submit', handleLogin);
-  
-  // Signup form
-  document.getElementById('signupForm').addEventListener('submit', handleSignup);
-  
   // Profile form
   document.getElementById('profileForm').addEventListener('submit', saveProfile);
   
@@ -76,115 +49,6 @@ function setupEventListeners() {
   // Danger zone buttons
   document.getElementById('deactivateAccountBtn').addEventListener('click', deactivateAccount);
   document.getElementById('deleteAccountBtn').addEventListener('click', deleteAccount);
-}
-
-// Handle login
-async function handleLogin(e) {
-  e.preventDefault();
-  console.log('[Profile] Login attempt');
-  
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      console.log('[Profile] Login successful');
-      currentUser = data;
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      // Hide the inline auth modal in profile.html
-      const authModal = document.getElementById('authModal');
-      if (authModal) {
-        authModal.style.display = 'none';
-      }
-      document.getElementById('mainContent').style.display = 'block';
-      await loadProfileData();
-    } else {
-      alert(data.error || 'Login failed');
-      console.error('[Profile] Login error:', data);
-    }
-  } catch (error) {
-    console.error('[Profile] Login error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle signup
-async function handleSignup(e) {
-  e.preventDefault();
-  console.log('[Profile] Signup attempt');
-  
-  const full_name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
-  const password = document.getElementById('signupPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ full_name, email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      console.log('[Profile] Signup successful');
-      currentUser = data;
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      // Hide the inline auth modal in profile.html
-      const authModal = document.getElementById('authModal');
-      if (authModal) {
-        authModal.style.display = 'none';
-      }
-      document.getElementById('mainContent').style.display = 'block';
-      await loadProfileData();
-    } else {
-      alert(data.error || 'Signup failed');
-      console.error('[Profile] Signup error:', data);
-    }
-  } catch (error) {
-    console.error('[Profile] Signup error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle logout
-async function handleLogout() {
-  console.log('[Profile] Logout attempt');
-  
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    
-    // Clear auth token from session storage
-    sessionStorage.removeItem('auth_token');
-    
-    window.location.href = '/';
-  } catch (error) {
-    console.error('[Profile] Logout error:', error);
-    window.location.href = '/';
-  }
 }
 
 // Load profile data from API

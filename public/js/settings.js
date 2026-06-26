@@ -15,16 +15,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const authResult = await window.checkAuth();
   
   if (!authResult.authenticated) {
-    // User is not authenticated, show the inline modal
-    document.getElementById('authModal').style.display = 'flex';
+    // User is not authenticated, show the auth modal from auth.js
+    window.showAuthModal();
     return;
   }
   
   currentUser = authResult.user;
-  document.getElementById('mainContent').style.display = 'block';
   
-  // Update navbar with logout handler
-  updateNavbar(currentUser);
+  // Update navbar with user info (using auth.js function)
+  window.updateNavbar(currentUser);
   
   // Load user settings
   await loadUserSettings();
@@ -34,43 +33,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 });
 
-// Update navbar with user info and logout button
-function updateNavbar(user) {
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.style.display = 'inline-block';
-    logoutBtn.onclick = handleLogout;
-  }
-}
-
 // Setup event listeners
 function setupEventListeners() {
-  // Logout button
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.style.display = 'inline-block';
-    logoutBtn.addEventListener('click', handleLogout);
-  }
-  
-  // Auth form switching
-  document.getElementById('showSignup').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('signupForm').style.display = 'block';
-  });
-  
-  document.getElementById('showLogin').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('signupForm').style.display = 'none';
-    document.getElementById('loginForm').style.display = 'block';
-  });
-  
-  // Login form
-  document.getElementById('loginForm').addEventListener('submit', handleLogin);
-  
-  // Signup form
-  document.getElementById('signupForm').addEventListener('submit', handleSignup);
-  
   // Integration buttons
   document.querySelectorAll('.btn-connect').forEach(btn => {
     btn.addEventListener('click', handleConnectIntegration);
@@ -88,111 +52,6 @@ function setupEventListeners() {
   
   // Test WhatsApp button
   document.getElementById('testWhatsappBtn').addEventListener('click', testWhatsAppConnection);
-}
-
-// Handle login
-async function handleLogin(e) {
-  e.preventDefault();
-  console.log('[Settings] Login attempt');
-  
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      console.log('[Settings] Login successful');
-      currentUser = data.user;
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      document.getElementById('authModal').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      updateNavbar(currentUser);
-      await loadUserSettings();
-      await loadIntegrations();
-    } else {
-      alert(data.error || 'Login failed');
-      console.error('[Settings] Login error:', data);
-    }
-  } catch (error) {
-    console.error('[Settings] Login error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle signup
-async function handleSignup(e) {
-  e.preventDefault();
-  console.log('[Settings] Signup attempt');
-  
-  const full_name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
-  const password = document.getElementById('signupPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ full_name, email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      console.log('[Settings] Signup successful');
-      currentUser = data.user;
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      document.getElementById('authModal').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      updateNavbar(currentUser);
-      await loadUserSettings();
-      await loadIntegrations();
-    } else {
-      alert(data.error || 'Signup failed');
-      console.error('[Settings] Signup error:', data);
-    }
-  } catch (error) {
-    console.error('[Settings] Signup error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle logout
-async function handleLogout() {
-  console.log('[Settings] Logout attempt');
-  
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    
-    // Clear auth token from session storage
-    sessionStorage.removeItem('auth_token');
-    
-    window.location.href = '/';
-  } catch (error) {
-    console.error('[Settings] Logout error:', error);
-    window.location.href = '/';
-  }
 }
 
 // Load user settings from API

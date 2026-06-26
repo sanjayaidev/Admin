@@ -9,130 +9,90 @@
   <link rel="stylesheet" href="/css/auh-modal.css">
 </head>
 <body>
-  <!-- Auth Modal -->
-  <div id="authModal" class="modal">
-    <div class="modal-content auth-modal">
-      <h2>Authentication Required</h2>
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" required>
-        </div>
-        <div class="form-group">
-          <label for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Login</button>
-      </form>
-      <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-      
-      <form id="signupForm" style="display: none;">
-        <div class="form-group">
-          <label for="signupName">Full Name</label>
-          <input type="text" id="signupName" required>
-        </div>
-        <div class="form-group">
-          <label for="signupEmail">Email</label>
-          <input type="email" id="signupEmail" required>
-        </div>
-        <div class="form-group">
-          <label for="signupPassword">Password</label>
-          <input type="password" id="signupPassword" required minlength="6">
-        </div>
-        <button type="submit" class="btn btn-primary">Sign Up</button>
-      </form>
-      <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Login</a></p>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <span class="brand">ClientPM</span>
+    <a href="/">Dashboard</a>
+    <a href="/clients.html">Clients</a>
+    <a href="/tasks.html">Tasks</a>
+    <a href="/calendar.html">Calendar</a>
+    <a href="/team.html">Team</a>
+    <a href="/settings.html" class="active">Settings</a>
+    <a href="/profile.html">Profile</a>
+  </nav>
+
+  <div class="page">
+    <div class="page-header">
+      <h1>⚙️ Settings</h1>
     </div>
-  </div>
 
-  <!-- Main Content -->
-  <div id="mainContent" style="display: none;">
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="nav-brand">ClientPM</div>
-      <div class="nav-links">
-        <a href="/">Dashboard</a>
-        <a href="/clients.html">Clients</a>
-        <a href="/tasks.html">Tasks</a>
-        <a href="/calendar.html">Calendar</a>
-        <a href="/invoices.html">Invoices</a>
-        <a href="/team.html">Team</a>
-        <a href="/settings.html" class="active">Settings</a>
-        <a href="/profile.html">Profile</a>
-        <button id="logoutBtn" class="btn btn-outline">Logout</button>
-      </div>
-    </nav>
-
-    <div class="container">
-      <h1>Settings</h1>
-
-      <!-- Google Integrations Section -->
-      <section class="settings-section">
-        <h2>🔗 Google Integrations</h2>
-        <p class="section-description">Connect your Google account to enable calendar sync, file storage, and more.</p>
-        
-        <div class="integration-grid">
-          <!-- Google Calendar -->
-          <div class="integration-card" data-service="google_calendar">
-            <div class="integration-icon">📅</div>
-            <h3>Google Calendar</h3>
-            <p>Sync events and meetings</p>
-            <div class="integration-status">
-              <span class="status-badge disconnected">Disconnected</span>
-            </div>
-            <button class="btn btn-connect">Connect</button>
-            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+    <!-- Google Integrations Section -->
+    <section class="settings-section">
+      <h2>🔗 Google Integrations</h2>
+      <p class="section-description">Connect your Google account to enable calendar sync, file storage, and more.</p>
+      
+      <div class="integration-grid">
+        <!-- Google Calendar -->
+        <div class="integration-card" data-service="google_calendar">
+          <div class="integration-icon">📅</div>
+          <h3>Google Calendar</h3>
+          <p>Sync events and meetings</p>
+          <div class="integration-status">
+            <span class="status-badge disconnected">Disconnected</span>
           </div>
-
-          <!-- Google Drive -->
-          <div class="integration-card" data-service="google_drive">
-            <div class="integration-icon">📁</div>
-            <h3>Google Drive</h3>
-            <p>Store client files and documents</p>
-            <div class="integration-status">
-              <span class="status-badge disconnected">Disconnected</span>
-            </div>
-            <button class="btn btn-connect">Connect</button>
-            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-          </div>
-
-          <!-- Google Sheets -->
-          <div class="integration-card" data-service="google_sheets">
-            <div class="integration-icon">📊</div>
-            <h3>Google Sheets</h3>
-            <p>Export reports and data</p>
-            <div class="integration-status">
-              <span class="status-badge disconnected">Disconnected</span>
-            </div>
-            <button class="btn btn-connect">Connect</button>
-            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-          </div>
-
-          <!-- Gmail / Apps Script -->
-          <div class="integration-card" data-service="gmail">
-            <div class="integration-icon">📧</div>
-            <h3>Gmail (Apps Script)</h3>
-            <p>Send emails via Apps Script</p>
-            <div class="integration-status">
-              <span class="status-badge disconnected">Disconnected</span>
-            </div>
-            <button class="btn btn-connect">Connect</button>
-            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-          </div>
-
-          <!-- Google Meet -->
-          <div class="integration-card" data-service="google_meet">
-            <div class="integration-icon">🎥</div>
-            <h3>Google Meet</h3>
-            <p>Generate meeting links</p>
-            <div class="integration-status">
-              <span class="status-badge disconnected">Disconnected</span>
-            </div>
-            <button class="btn btn-connect">Connect</button>
-            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-          </div>
+          <button class="btn btn-connect">Connect</button>
+          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
         </div>
-      </section>
+
+        <!-- Google Drive -->
+        <div class="integration-card" data-service="google_drive">
+          <div class="integration-icon">📁</div>
+          <h3>Google Drive</h3>
+          <p>Store client files and documents</p>
+          <div class="integration-status">
+            <span class="status-badge disconnected">Disconnected</span>
+          </div>
+          <button class="btn btn-connect">Connect</button>
+          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+        </div>
+
+        <!-- Google Sheets -->
+        <div class="integration-card" data-service="google_sheets">
+          <div class="integration-icon">📊</div>
+          <h3>Google Sheets</h3>
+          <p>Export reports and data</p>
+          <div class="integration-status">
+            <span class="status-badge disconnected">Disconnected</span>
+          </div>
+          <button class="btn btn-connect">Connect</button>
+          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+        </div>
+
+        <!-- Gmail / Apps Script -->
+        <div class="integration-card" data-service="gmail">
+          <div class="integration-icon">📧</div>
+          <h3>Gmail (Apps Script)</h3>
+          <p>Send emails via Apps Script</p>
+          <div class="integration-status">
+            <span class="status-badge disconnected">Disconnected</span>
+          </div>
+          <button class="btn btn-connect">Connect</button>
+          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+        </div>
+
+        <!-- Google Meet -->
+        <div class="integration-card" data-service="google_meet">
+          <div class="integration-icon">🎥</div>
+          <h3>Google Meet</h3>
+          <p>Generate meeting links</p>
+          <div class="integration-status">
+            <span class="status-badge disconnected">Disconnected</span>
+          </div>
+          <button class="btn btn-connect">Connect</button>
+          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+        </div>
+      </div>
+    </section>
 
       <!-- WhatsApp Integration -->
       <section class="settings-section">
@@ -268,7 +228,6 @@
           <button type="submit" class="btn btn-primary">Save System Settings</button>
         </form>
       </section>
-    </div>
   </div>
 
   <script src="/js/utils.js"></script>
