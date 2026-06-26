@@ -445,5 +445,4 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Initialize
-initCalendar();
+// Initialize - initCalendar() is now called from auth.js after authentication check

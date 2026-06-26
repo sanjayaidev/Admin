@@ -8,48 +8,53 @@ let currentUser = null;
 let teamMembers = [];
 let isAdmin = false;
 
-// Initialize page
-document.addEventListener('DOMContentLoaded', async () => {
+// Initialize page - now handled by auth.js
+async function initTeamPage() {
   console.log('[Team] Page loaded');
-  
+
   // Check authentication using the global checkAuth from auth.js
   const authResult = await window.checkAuth();
-  
+
   if (!authResult.authenticated) {
     // User is not authenticated, show the auth modal from auth.js
     window.showAuthModal();
     return;
   }
-  
+
   currentUser = authResult.user;
   isAdmin = currentUser.role === 'admin';
-  
+
   // Show/hide admin features
   if (isAdmin) {
     document.getElementById('addMemberBtn').style.display = 'block';
   } else {
     document.getElementById('adminNotice').style.display = 'block';
   }
-  
+
   // Update navbar with user info (using auth.js function)
   window.updateNavbar(currentUser);
-  
+
   // Load team data
   await loadTeamMembers();
   await loadWorkloadData();
-  
+
   // Setup event listeners
   setupEventListeners();
-});
+}
+
+// Only run init if not called from auth.js
+if (typeof window.loadTeamMembers === 'undefined') {
+  document.addEventListener('DOMContentLoaded', initTeamPage);
+}
 
 // Setup event listeners
 function setupEventListeners() {
   // Add member button
   document.getElementById('addMemberBtn').addEventListener('click', () => openMemberModal());
-  
+
   // Member form
   document.getElementById('memberForm').addEventListener('submit', saveMember);
-  
+
   // Filters
   document.getElementById('roleFilter').addEventListener('change', filterTeamMembers);
   document.getElementById('statusFilter').addEventListener('change', filterTeamMembers);
@@ -59,16 +64,16 @@ function setupEventListeners() {
 // Load team members
 async function loadTeamMembers() {
   console.log('[Team] Loading team members');
-  
+
   try {
     const response = await fetch('/api/team/members', {
       credentials: 'include'
     });
-    
+
     if (response.ok) {
       teamMembers = await response.json();
       console.log('[Team] Team members loaded:', teamMembers);
-      
+
       renderTeamGrid(teamMembers);
       updateStats(teamMembers);
     } else {
@@ -82,16 +87,16 @@ async function loadTeamMembers() {
 // Render team grid
 function renderTeamGrid(members) {
   const grid = document.getElementById('teamGrid');
-  
+
   if (members.length === 0) {
     grid.innerHTML = '<p class="text-muted">No team members found</p>';
     return;
   }
-  
+
   grid.innerHTML = members.map(member => `
     <div class="team-card" data-role="${member.role}" data-status="${member.is_active ? 'active' : 'inactive'}">
       <div class="team-avatar">
-        ${member.avatar ? 
+        ${member.avatar ?
           `<img src="${member.avatar}" alt="${member.full_name}">` :
           `<span class="avatar-placeholder">${getInitials(member.full_name)}</span>`
         }
@@ -113,7 +118,7 @@ function renderTeamGrid(members) {
         <button class="btn btn-sm btn-${member.is_active ? 'warning' : 'success'}" onclick="toggleMemberStatus('${member.id}', ${!member.is_active})">
           ${member.is_active ? 'Deactivate' : 'Activate'}
         </button>
-        ${member.role !== 'admin' || currentUser.id === member.id ? '' : 
+        ${member.role !== 'admin' || currentUser.id === member.id ? '' :
           `<button class="btn btn-sm btn-danger" onclick="deleteMember('${member.id}')">Delete</button>`
         }
       </div>
@@ -128,7 +133,7 @@ function updateStats(members) {
   const admins = members.filter(m => m.role === 'admin').length;
   const team = members.filter(m => m.role === 'team').length;
   const clients = members.filter(m => m.role === 'client').length;
-  
+
   document.getElementById('totalMembers').textContent = total;
   document.getElementById('totalAdmins').textContent = admins;
   document.getElementById('totalTeam').textContent = team;
@@ -140,37 +145,37 @@ function filterTeamMembers() {
   const roleFilter = document.getElementById('roleFilter').value;
   const statusFilter = document.getElementById('statusFilter').value;
   const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-  
+
   let filtered = teamMembers;
-  
+
   if (roleFilter !== 'all') {
     filtered = filtered.filter(m => m.role === roleFilter);
   }
-  
+
   if (statusFilter !== 'all') {
     const isActive = statusFilter === 'active';
     filtered = filtered.filter(m => m.is_active === isActive);
   }
-  
+
   if (searchTerm) {
-    filtered = filtered.filter(m => 
+    filtered = filtered.filter(m =>
       m.full_name.toLowerCase().includes(searchTerm) ||
       m.email.toLowerCase().includes(searchTerm)
     );
   }
-  
+
   renderTeamGrid(filtered);
 }
 
 // Load workload data
 async function loadWorkloadData() {
   console.log('[Team] Loading workload data');
-  
+
   try {
     const response = await fetch('/api/team/workload', {
       credentials: 'include'
     });
-    
+
     if (response.ok) {
       const workload = await response.json();
       console.log('[Team] Workload data loaded:', workload);
@@ -184,12 +189,12 @@ async function loadWorkloadData() {
 // Render workload grid
 function renderWorkloadGrid(workload) {
   const grid = document.getElementById('workloadGrid');
-  
+
   if (!workload || workload.length === 0) {
     grid.innerHTML = '<p class="text-muted">No workload data available</p>';
     return;
   }
-  
+
   grid.innerHTML = workload.map(item => `
     <div class="workload-card">
       <div class="workload-header">
@@ -221,9 +226,9 @@ function openMemberModal(member = null) {
   const modal = document.getElementById('memberModal');
   const form = document.getElementById('memberForm');
   const title = document.getElementById('modalTitle');
-  
+
   form.reset();
-  
+
   if (member) {
     title.textContent = 'Edit Team Member';
     document.getElementById('memberId').value = member.id;
@@ -236,7 +241,7 @@ function openMemberModal(member = null) {
     title.textContent = 'Add Team Member';
     document.getElementById('memberId').value = '';
   }
-  
+
   modal.style.display = 'flex';
 }
 
@@ -260,30 +265,30 @@ window.closeMemberModal = closeMemberModal;
 // Save member
 async function saveMember(e) {
   e.preventDefault();
-  
+
   const memberId = document.getElementById('memberId').value;
   const full_name = document.getElementById('memberName').value.trim();
   const email = document.getElementById('memberEmail').value.trim();
   const phone = document.getElementById('memberPhone').value.trim();
   const role = document.getElementById('memberRole').value;
   const password = document.getElementById('memberPassword').value;
-  
+
   const data = { full_name, email, phone, role };
   if (password) {
     data.password = password;
   }
-  
+
   try {
     const url = memberId ? `/api/team/members/${memberId}` : '/api/team/members';
     const method = memberId ? 'PUT' : 'POST';
-    
+
     const response = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(data)
     });
-    
+
     if (response.ok) {
       console.log('[Team] Member saved');
       closeMemberModal();
@@ -304,7 +309,7 @@ async function toggleMemberStatus(id, isActive) {
   if (!confirm(`Are you sure you want to ${isActive ? 'activate' : 'deactivate'} this member?`)) {
     return;
   }
-  
+
   try {
     const response = await fetch(`/api/team/members/${id}/status`, {
       method: 'PUT',
@@ -312,7 +317,7 @@ async function toggleMemberStatus(id, isActive) {
       credentials: 'include',
       body: JSON.stringify({ is_active: isActive })
     });
-    
+
     if (response.ok) {
       console.log('[Team] Member status updated');
       await loadTeamMembers();
@@ -331,18 +336,18 @@ async function deleteMember(id) {
   if (!confirm('Are you sure you want to delete this team member? This cannot be undone.')) {
     return;
   }
-  
+
   const confirmation = prompt('Type "DELETE" to confirm:');
   if (confirmation !== 'DELETE') {
     return;
   }
-  
+
   try {
     const response = await fetch(`/api/team/members/${id}`, {
       method: 'DELETE',
       credentials: 'include'
     });
-    
+
     if (response.ok) {
       console.log('[Team] Member deleted');
       await loadTeamMembers();

@@ -69,7 +69,6 @@ function clientCardHtml(client) {
 function searchClients() {
   const input = document.getElementById('search-input');
   searchTerm = input ? input.value : '';
-  loadClients();
 }
 
 // Modal functions
@@ -188,9 +187,8 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Initialize
+// Initialize - loadClients() is now called from auth.js after authentication check
 document.addEventListener('DOMContentLoaded', () => {
-  loadClients();
   
   // Set up search with debounce
   const searchInput = document.getElementById('search-input');
