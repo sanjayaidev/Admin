@@ -1035,6 +1035,9 @@ app.get('/api/share/:slug', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching share data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // ============ STATIC FILE SERVING ============
 
