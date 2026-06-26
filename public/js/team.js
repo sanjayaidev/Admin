@@ -16,15 +16,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const authResult = await window.checkAuth();
   
   if (!authResult.authenticated) {
-    // User is not authenticated, show the inline modal
-    document.getElementById('authModal').style.display = 'flex';
+    // User is not authenticated, show the auth modal from auth.js
+    window.showAuthModal();
     return;
   }
   
   currentUser = authResult.user;
   isAdmin = currentUser.role === 'admin';
-  
-  document.getElementById('mainContent').style.display = 'block';
   
   // Show/hide admin features
   if (isAdmin) {
@@ -33,8 +31,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('adminNotice').style.display = 'block';
   }
   
-  // Update navbar with logout handler
-  updateNavbar(currentUser);
+  // Update navbar with user info (using auth.js function)
+  window.updateNavbar(currentUser);
   
   // Load team data
   await loadTeamMembers();
@@ -44,39 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 });
 
-// Update navbar with user info and logout button
-function updateNavbar(user) {
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.style.display = 'inline-block';
-    logoutBtn.onclick = handleLogout;
-  }
-}
-
 // Setup event listeners
 function setupEventListeners() {
-  // Logout button
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-  
-  // Auth form switching
-  document.getElementById('showSignup').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('signupForm').style.display = 'block';
-  });
-  
-  document.getElementById('showLogin').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('signupForm').style.display = 'none';
-    document.getElementById('loginForm').style.display = 'block';
-  });
-  
-  // Login form
-  document.getElementById('loginForm').addEventListener('submit', handleLogin);
-  
-  // Signup form
-  document.getElementById('signupForm').addEventListener('submit', handleSignup);
-  
   // Add member button
   document.getElementById('addMemberBtn').addEventListener('click', () => openMemberModal());
   
@@ -87,109 +54,6 @@ function setupEventListeners() {
   document.getElementById('roleFilter').addEventListener('change', filterTeamMembers);
   document.getElementById('statusFilter').addEventListener('change', filterTeamMembers);
   document.getElementById('searchInput').addEventListener('input', filterTeamMembers);
-}
-
-// Handle login
-async function handleLogin(e) {
-  e.preventDefault();
-  
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      currentUser = data.user;
-      isAdmin = currentUser.role === 'admin';
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      document.getElementById('authModal').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      
-      if (isAdmin) {
-        document.getElementById('addMemberBtn').style.display = 'block';
-      } else {
-        document.getElementById('adminNotice').style.display = 'block';
-      }
-      
-      updateNavbar(currentUser);
-      await loadTeamMembers();
-    } else {
-      alert(data.error || 'Login failed');
-    }
-  } catch (error) {
-    console.error('[Team] Login error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle signup
-async function handleSignup(e) {
-  e.preventDefault();
-  
-  const full_name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
-  const password = document.getElementById('signupPassword').value;
-  
-  try {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ full_name, email, password })
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-      currentUser = data.user;
-      
-      // Store auth token in session storage
-      if (data.token) {
-        sessionStorage.setItem('auth_token', data.token);
-      }
-      
-      document.getElementById('authModal').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      updateNavbar(currentUser);
-      await loadTeamMembers();
-    } else {
-      alert(data.error || 'Signup failed');
-    }
-  } catch (error) {
-    console.error('[Team] Signup error:', error);
-    alert('Network error. Please try again.');
-  }
-}
-
-// Handle logout
-async function handleLogout() {
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    
-    // Clear auth token from session storage
-    sessionStorage.removeItem('auth_token');
-    
-    window.location.href = '/';
-  } catch (error) {
-    console.error('[Team] Logout error:', error);
-    window.location.href = '/';
-  }
 }
 
 // Load team members

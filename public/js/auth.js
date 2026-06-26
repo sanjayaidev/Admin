@@ -377,3 +377,4 @@ window.logout = logout;
 window.checkAuth = checkAuth;
 window.switchAuthTab = switchAuthTab;
 window.showAuthModal = showAuthModal;
+window.updateNavbar = updateNavbar;
