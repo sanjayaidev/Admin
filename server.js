@@ -55,8 +55,6 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 const app = express();
-const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // ============ MIDDLEWARE ============
 
