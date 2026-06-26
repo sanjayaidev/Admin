@@ -33,7 +33,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Setup event listeners
 function setupEventListeners() {
   // Logout button
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.style.display = 'inline-block';
+    logoutBtn.addEventListener('click', handleLogout);
+  }
   
   // Auth form switching
   document.getElementById('showSignup').addEventListener('click', (e) => {
