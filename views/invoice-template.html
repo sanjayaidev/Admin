@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice {{invoice_number}} - ClientPM</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    .invoice-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    .logo span {
+      color: #3498db;
+    }
+    .invoice-title {
+      text-align: right;
+    }
+    .invoice-title h1 {
+      font-size: 36px;
+      color: #2c3e50;
+      margin-bottom: 5px;
+    }
+    .invoice-number {
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .status-draft { background: #ffeaa7; color: #d63031; }
+    .status-sent { background: #74b9ff; color: #0984e3; }
+    .status-paid { background: #55efc4; color: #00b894; }
+    .status-overdue { background: #fab1a0; color: #d63031; }
+    
+    .client-info {
+      margin-bottom: 30px;
+    }
+    .client-info h3 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .client-details {
+      color: #555;
+      line-height: 1.8;
+    }
+    .dates {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    .date-item {
+      flex: 1;
+    }
+    .date-item label {
+      display: block;
+      font-size: 12px;
+      color: #7f8c8d;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .date-item span {
+      font-size: 16px;
+      color: #2c3e50;
+      font-weight: 500;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 30px 0;
+    }
+    th {
+      background: #f8f9fa;
+      padding: 12px 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #2c3e50;
+      border-bottom: 2px solid #dee2e6;
+    }
+    td {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .amount-col {
+      text-align: right;
+      width: 150px;
+    }
+    .totals-section {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    .totals-table {
+      width: 300px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 15px;
+      border-bottom: 1px solid #eee;
+    }
+    .totals-row.subtotal {
+      background: #f8f9fa;
+    }
+    .totals-row.total {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2c3e50;
+      border-top: 2px solid #2c3e50;
+      border-bottom: none;
+      margin-top: 10px;
+    }
+    .notes {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+    .notes h4 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #95a5a6;
+      font-size: 12px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    .print-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .print-btn:hover {
+      background: #2980b9;
+    }
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .invoice-container {
+        box-shadow: none;
+      }
+      .print-btn {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+  
+  <div class="invoice-container">
+    <div class="header">
+      <div class="logo">Client<span>PM</span></div>
+      <div class="invoice-title">
+        <h1>INVOICE</h1>
+        <p class="invoice-number">#{{invoice_number}}</p>
+        <span class="status-badge status-{{status}}">{{status}}</span>
+      </div>
+    </div>
+
+    <div class="client-info">
+      <h3>Bill To:</h3>
+      <div class="client-details">
+        <strong>{{client_name}}</strong><br>
+        {{#company}}{{company}}<br>{{/company}}
+        {{#address}}{{address}}<br>{{/address}}
+        {{#client_email}}{{client_email}}<br>{{/client_email}}
+        {{#client_phone}}{{client_phone}}{{/client_phone}}
+      </div>
+    </div>
+
+    <div class="dates">
+      <div class="date-item">
+        <label>Issue Date</label>
+        <span>{{issue_date}}</span>
+      </div>
+      <div class="date-item">
+        <label>Due Date</label>
+        <span>{{due_date}}</span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="amount-col">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#work_items}}
+        <tr>
+          <td>
+            <strong>{{title}}</strong>
+            {{#description}}<br><small style="color: #7f8c8d;">{{description}}</small>{{/description}}
+          </td>
+          <td class="amount-col">${{amount}}</td>
+        </tr>
+        {{/work_items}}
+      </tbody>
+    </table>
+
+    <div class="totals-section">
+      <div class="totals-table">
+        <div class="totals-row subtotal">
+          <span>Subtotal</span>
+          <span>${{subtotal}}</span>
+        </div>
+        <div class="totals-row">
+          <span>Tax (18%)</span>
+          <span>${{tax}}</span>
+        </div>
+        <div class="totals-row total">
+          <span>Total Due</span>
+          <span>${{total}}</span>
+        </div>
+      </div>
+    </div>
+
+    {{#notes}}
+    <div class="notes">
+      <h4>Notes</h4>
+      <p>{{notes}}</p>
+    </div>
+    {{/notes}}
+
+    <div class="footer">
+      <p>Thank you for your business!</p>
+      <p>Generated by ClientPM on {{generated_at}}</p>
+    </div>
+  </div>
+
+  <script>
+    // Simple template rendering (replace with actual data in production)
+    document.addEventListener('DOMContentLoaded', function() {
+      // This would be populated with actual invoice data from the server
+      console.log('Invoice loaded');
+    });
+  </script>
+</body>
+</html>

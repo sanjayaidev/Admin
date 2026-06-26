@@ -8,6 +8,8 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { URL } = require('url');
+const cors = require('cors');
 const fs = require('fs');
 
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
@@ -22,6 +24,36 @@ const {
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 
+// Redis client setup
+const { createClient } = require('redis');
+const redisClient = createClient({
+  url: process.env.REDIS_URL || 'redis://default:pZlavLQOvIlqmJCzRqCsgqWBhQWXgxPx@localhost:6379'
+});
+
+redisClient.on('error', (err) => console.error('Redis Client Error:', err));
+redisClient.on('connect', () => console.log('Redis Client Connected'));
+
+// Initialize Redis connection
+(async () => {
+  try {
+    await redisClient.connect();
+    console.log('✅ Redis connected successfully');
+  } catch (err) {
+    console.error('❌ Failed to connect to Redis:', err.message);
+    // Continue without Redis for development
+  }
+})();
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// CORS configuration
+const corsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
