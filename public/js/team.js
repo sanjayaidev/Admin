@@ -12,10 +12,12 @@ let isAdmin = false;
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Team] Page loaded');
   
-  // Check authentication
-  const authResult = await checkAuth();
+  // Check authentication using the global checkAuth from auth.js
+  const authResult = await window.checkAuth();
+  
   if (!authResult.authenticated) {
-    showAuthModal();
+    // User is not authenticated, show the inline modal
+    document.getElementById('authModal').style.display = 'flex';
     return;
   }
   
@@ -31,6 +33,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('adminNotice').style.display = 'block';
   }
   
+  // Update navbar with logout handler
+  updateNavbar(currentUser);
+  
   // Load team data
   await loadTeamMembers();
   await loadWorkloadData();
@@ -39,9 +44,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 });
 
-// Show auth modal
-function showAuthModal() {
-  document.getElementById('authModal').style.display = 'flex';
+// Update navbar with user info and logout button
+function updateNavbar(user) {
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.style.display = 'inline-block';
+    logoutBtn.onclick = handleLogout;
+  }
 }
 
 // Setup event listeners
@@ -100,6 +109,12 @@ async function handleLogin(e) {
     if (response.ok) {
       currentUser = data.user;
       isAdmin = currentUser.role === 'admin';
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       document.getElementById('authModal').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
       
@@ -109,6 +124,7 @@ async function handleLogin(e) {
         document.getElementById('adminNotice').style.display = 'block';
       }
       
+      updateNavbar(currentUser);
       await loadTeamMembers();
     } else {
       alert(data.error || 'Login failed');
@@ -139,8 +155,15 @@ async function handleSignup(e) {
     
     if (response.ok) {
       currentUser = data.user;
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       document.getElementById('authModal').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
+      updateNavbar(currentUser);
       await loadTeamMembers();
     } else {
       alert(data.error || 'Signup failed');
@@ -158,6 +181,10 @@ async function handleLogout() {
       method: 'POST',
       credentials: 'include'
     });
+    
+    // Clear auth token from session storage
+    sessionStorage.removeItem('auth_token');
+    
     window.location.href = '/';
   } catch (error) {
     console.error('[Team] Logout error:', error);

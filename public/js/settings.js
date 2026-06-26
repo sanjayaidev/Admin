@@ -11,15 +11,20 @@ let integrations = {};
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Settings] Page loaded');
   
-  // Check authentication
-  const authResult = await checkAuth();
+  // Check authentication using the global checkAuth from auth.js
+  const authResult = await window.checkAuth();
+  
   if (!authResult.authenticated) {
-    showAuthModal();
+    // User is not authenticated, show the inline modal
+    document.getElementById('authModal').style.display = 'flex';
     return;
   }
   
   currentUser = authResult.user;
   document.getElementById('mainContent').style.display = 'block';
+  
+  // Update navbar with logout handler
+  updateNavbar(currentUser);
   
   // Load user settings
   await loadUserSettings();
@@ -29,15 +34,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 });
 
-// Show auth modal
-function showAuthModal() {
-  document.getElementById('authModal').style.display = 'flex';
+// Update navbar with user info and logout button
+function updateNavbar(user) {
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.style.display = 'inline-block';
+    logoutBtn.onclick = handleLogout;
+  }
 }
 
 // Setup event listeners
 function setupEventListeners() {
   // Logout button
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.style.display = 'inline-block';
+    logoutBtn.addEventListener('click', handleLogout);
+  }
   
   // Auth form switching
   document.getElementById('showSignup').addEventListener('click', (e) => {
@@ -106,6 +119,7 @@ async function handleLogin(e) {
       
       document.getElementById('authModal').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
+      updateNavbar(currentUser);
       await loadUserSettings();
       await loadIntegrations();
     } else {
@@ -140,8 +154,15 @@ async function handleSignup(e) {
     if (response.ok) {
       console.log('[Settings] Signup successful');
       currentUser = data.user;
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       document.getElementById('authModal').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
+      updateNavbar(currentUser);
       await loadUserSettings();
       await loadIntegrations();
     } else {
@@ -163,6 +184,9 @@ async function handleLogout() {
       method: 'POST',
       credentials: 'include'
     });
+    
+    // Clear auth token from session storage
+    sessionStorage.removeItem('auth_token');
     
     window.location.href = '/';
   } catch (error) {

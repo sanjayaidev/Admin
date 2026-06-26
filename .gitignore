@@ -4,6 +4,11 @@
 __pycache__/
 *.o
 *.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
 dist/
 build/
 target/
@@ -20,6 +25,7 @@ venv/
 *.log
 *.tmp
 *.swp
+*.swo
 
 # Editors
 .vscode/
@@ -27,55 +33,12 @@ venv/
 *.swp
 *.swo
 
-# Python specific
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
-.Python
-env/
-.venv/
-venv/
-ENV/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+# Coverage
+coverage/
+htmlcov/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-*.sublime-workspace
-.pytest_cache/
-.mypy_cache/
-.hypothesis/
 
-# Node.js specific
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
-dist/
-build/
-.nyc_output
-coverage/
-*.lcov
-.nyc_output/
-coverage/
-
-# General build artifacts
-*.exe
-*.dll
-*.so
-*.a
-*.out
-*.class
-
-# Compressed files
+# Compression
 *.zip
 *.gz
 *.tar
@@ -99,7 +62,131 @@ coverage/
 *.tar.xz
 *.tar.zst
 
-# System files
+# System
+.DS_Store
+Thumbs.db
+
+# Python specific
+*.pyc
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# Node specific
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Java specific
+*.class
+.gradle/
+build/
+target/
+
+# C/C++ specific
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Go specific
+*.o
+*.a
+*.swp
+*~
+.DS_Store
+.svn
+CVS
+.git
+.gitignore
+_*~
+*.orig
+*.rej
+*.bak
+*.tmp
+*.log
+*.out
+*.pid
+*.seed
+*.prof
+*.gcda
+*.gcno
+*.gcov
+*.stackdump
+*.core
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.nfs*
+*.~lock*
+*.swpx
+*~
+\#*\#
+.\#*
+%*%
+._*
+.CVS*
+.RCS*
+.SCCS*
+[Tt]ag
+[Tt]ags
+TAGS
+[Mm]akefile
+makefile
+*.mak
+*.mk
+*.orig
+*.rej
+*.bak
+*.BAK
+*.old
+*.OLD
+*.new
+*.NEW
+*.tmp
+*.temp
+*.log
+*.out
+*.pid
+*.seed
+*.prof
+*.gcda
+*.gcno
+*.gcov
+*.stackdump
+*.core
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.nfs*
+*.~lock*
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+%*%
+._*
+.CVS*
+.RCS*
+.SCCS*
+[Tt]ag
+[Tt]ags
+TAGS
+[Mm]akefile
+makefile
+*.mak
+*.mk
 .DS_Store
 Thumbs.db
 ```
