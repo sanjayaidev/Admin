@@ -15,12 +15,15 @@ const { pool, migrate, makeUniqueSlug } = require('./lib/db');
 const { logger, errorLogger } = require('./middleware/logger');
 const { 
   createUser, 
+  createDefaultAdmin,
   authenticateUser, 
   createSession, 
   validateSession, 
   deleteSession,
   getUserById,
-  hasRole
+  hasRole,
+  verifyPassword,
+  hashPassword
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 
@@ -197,6 +200,53 @@ app.post('/api/auth/logout', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change password
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+    
+    // Get current user's password hash
+    const { rows } = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const user = rows[0];
+    
+    // Verify current password
+    const isValid = await verifyPassword(current_password, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const newPasswordHash = await hashPassword(new_password);
+    
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newPasswordHash, req.user.id]
+    );
+    
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -772,6 +822,7 @@ app.use((err, req, res, next) => {
 
 // Ensure database migrations run before starting
 migrate()
+  .then(() => createDefaultAdmin())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`✅ ClientPM server running at http://localhost:${PORT}`);
