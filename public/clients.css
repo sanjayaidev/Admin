@@ -1,6 +1,22 @@
 /* Clients-specific styles */
+
+/* Client grid layout */
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  /* FIX: justify-items: center was centering each card at its own
+     shrink-wrapped content width instead of letting it fill the cell.
+     Default (stretch) makes every card fill its grid column. */
+}
+
 /* Center-align content in client cards */
 .client-card {
+  /* FIX: card had no width, so as a flex column with align-items:center
+     it shrink-wrapped to content width and looked "collapsed" inside
+     its grid cell. */
+  width: 100%;
+  box-sizing: border-box;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -19,18 +35,15 @@
   text-align: center;
 }
 .client-info {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   width: 100%;
 }
 .client-info-item {
+  display: flex;
   justify-content: center;
-}
-/* Client grid layout */
-.clients-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-  justify-items: center;
+  width: 100%;
 }
 /* Modal form centered labels and inputs */
 .modal-box label {
@@ -68,7 +81,7 @@
   .clients-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .client-card {
     max-width: 400px;
     width: 100%;
