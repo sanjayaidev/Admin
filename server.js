@@ -730,6 +730,250 @@ app.get('/api/share/:slug', optionalAuth, async (req, res) => {
     const { start_date, end_date, status } = req.query;
     
     // Get client by slug
+    const { rows: clientRows } = await pool.query(
+      'SELECT * FROM clients WHERE slug = $1',
+      [slug]
+    );
+    
+    if (clientRows.length === 0) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    
+    const client = clientRows[0];
+    
+    // Build query for work items
+    let query = `
+      SELECT * FROM work_items
+      WHERE client_id = $1
+    `;
+    const params = [client.id];
+    let paramIndex = 2;
+    
+    if (start_date) {
+      query += ` AND due_date >= $${paramIndex}`;
+      params.push(start_date);
+      paramIndex++;
+    }
+    if (end_date) {
+      query += ` AND due_date <= $${paramIndex}`;
+      params.push(end_date);
+      paramIndex++;
+    }
+    if (status) {
+      query += ` AND status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
+    }
+    
+    query += ' ORDER BY due_date ASC NULLS LAST, created_at DESC';
+    
+    const { rows: workItems } = await pool.query(query, params);
+    
+    // Calculate payment summary
+    const summary = {
+      total: 0,
+      paid: 0,
+      partial: 0,
+      unpaid: 0
+    };
+    
+    workItems.forEach(item => {
+      const amount = Number(item.amount) || 0;
+      summary.total += amount;
+      if (item.payment_status === 'paid') {
+        summary.paid += amount;
+      } else if (item.payment_status === 'partial') {
+        summary.partial += amount;
+      } else {
+        summary.unpaid += amount;
+      }
+    });
+    
+    res.json({
+      client,
+      workItems,
+      summary
+    });
+  } catch (error) {
+    console.error('Error fetching share data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============ TEAM MANAGEMENT API ============
+
+// Get all team members
+app.get('/api/team/members', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, full_name, email, phone, role, avatar, is_active, created_at FROM users ORDER BY created_at DESC'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create new team member
+app.post('/api/team/members', requireRole(['admin']), async (req, res) => {
+  try {
+    const { full_name, email, phone, role, password } = req.body;
+    
+    if (!full_name || !email || !role) {
+      return res.status(400).json({ error: 'Name, email, and role are required' });
+    }
+    
+    // Check if email already exists
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    
+    const tempPassword = password || Math.random().toString(36).slice(-8);
+    
+    const { rows } = await pool.query(
+      `INSERT INTO users (full_name, email, phone, role, password_hash)
+       VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf')))
+       RETURNING id, full_name, email, phone, role, avatar, is_active, created_at`,
+      [full_name, email, phone || null, role, tempPassword]
+    );
+    
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating team member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update team member
+app.put('/api/team/members/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { full_name, email, phone, role, password } = req.body;
+    
+    if (!full_name || !email || !role) {
+      return res.status(400).json({ error: 'Name, email, and role are required' });
+    }
+    
+    // Check if email is taken by another user
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, id]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    
+    let query;
+    let params;
+    
+    if (password) {
+      query = `
+        UPDATE users 
+        SET full_name = $1, email = $2, phone = $3, role = $4, password_hash = crypt($5, gen_salt('bf'))
+        WHERE id = $6
+        RETURNING id, full_name, email, phone, role, avatar, is_active, created_at
+      `;
+      params = [full_name, email, phone || null, role, password, id];
+    } else {
+      query = `
+        UPDATE users 
+        SET full_name = $1, email = $2, phone = $3, role = $4
+        WHERE id = $5
+        RETURNING id, full_name, email, phone, role, avatar, is_active, created_at
+      `;
+      params = [full_name, email, phone || null, role, id];
+    }
+    
+    const { rows } = await pool.query(query, params);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating team member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete team member
+app.delete('/api/team/members/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prevent deleting yourself
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    
+    if (rowCount === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting team member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Toggle member status
+app.put('/api/team/members/:id/status', requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body;
+    
+    const { rows } = await pool.query(
+      'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, full_name, email, phone, role, avatar, is_active, created_at',
+      [is_active, id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error toggling member status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get workload distribution
+app.get('/api/team/workload', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        u.id AS user_id,
+        u.full_name AS member_name,
+        COUNT(w.id) AS task_count,
+        COUNT(CASE WHEN w.status = 'pending' THEN 1 END) AS pending,
+        COUNT(CASE WHEN w.status = 'in-progress' THEN 1 END) AS in_progress,
+        COUNT(CASE WHEN w.status = 'completed' THEN 1 END) AS completed
+      FROM users u
+      LEFT JOIN work_items w ON w.assigned_to = u.id
+      WHERE u.role IN ('admin', 'team')
+      GROUP BY u.id, u.full_name
+      ORDER BY task_count DESC
+    `);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching workload:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Share link (public client view - no auth required)
+app.get('/api/share/:slug', optionalAuth, async (req, res) => {
+  try {
+    await migrate();
+    const { slug } = req.params;
+    const { start_date, end_date, status } = req.query;
+    
+    // Get client by slug
     const { rows: clientRows } = await pool.query('SELECT * FROM clients WHERE slug = $1', [slug]);
     if (clientRows.length === 0) {
       return res.status(404).json({ error: 'Client not found' });
@@ -791,9 +1035,6 @@ app.get('/api/share/:slug', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching share data:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // ============ STATIC FILE SERVING ============
 
