@@ -98,6 +98,12 @@ async function handleLogin(e) {
     if (response.ok) {
       console.log('[Settings] Login successful');
       currentUser = data.user;
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       document.getElementById('authModal').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
       await loadUserSettings();

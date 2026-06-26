@@ -3,23 +3,43 @@
 // Frontend authentication logic
 
 let currentUser = null;
+let authToken = null;
 
 // Check if user is authenticated
 async function checkAuth() {
+  // First check if we have a token in session storage
+  if (!authToken) {
+    authToken = sessionStorage.getItem('auth_token');
+  }
+  
   try {
-    const res = await fetch('/api/auth/me');
+    const headers = {};
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    const res = await fetch('/api/auth/me', {
+      headers,
+      credentials: 'include'
+    });
     
     if (res.ok) {
-      currentUser = await res.json();
-      showAppContent(currentUser);
-      return currentUser;
+      const user = await res.json();
+      currentUser = user;
+      
+      // Store token if not already stored
+      if (!authToken && user.token) {
+        authToken = user.token;
+        sessionStorage.setItem('auth_token', authToken);
+      }
+      
+      return { authenticated: true, user };
     }
   } catch (e) {
     // Not authenticated
   }
   
-  showAuthModal();
-  return null;
+  return { authenticated: false, user: null };
 }
 
 // Show authentication modal
@@ -118,6 +138,13 @@ async function login(email, password) {
     
     const user = await res.json();
     currentUser = user;
+    
+    // Store auth token in session storage
+    if (user.token) {
+      authToken = user.token;
+      sessionStorage.setItem('auth_token', authToken);
+    }
+    
     hideAuthModal();
     showAppContent(user);
     
@@ -156,6 +183,13 @@ async function signup(fullName, email, password, role) {
     
     const user = await res.json();
     currentUser = user;
+    
+    // Store auth token in session storage
+    if (user.token) {
+      authToken = user.token;
+      sessionStorage.setItem('auth_token', authToken);
+    }
+    
     hideAuthModal();
     showAppContent(user);
     
@@ -179,6 +213,10 @@ async function logout() {
   }
   
   currentUser = null;
+  authToken = null;
+  
+  // Clear auth token from session storage
+  sessionStorage.removeItem('auth_token');
   
   // Clear app content
   document.querySelectorAll('.page').forEach(page => {
