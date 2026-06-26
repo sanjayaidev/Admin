@@ -9,62 +9,84 @@
 </head>
 <body>
   <nav class="navbar">
-    <span class="brand">ClientPM</span>
+    <span class="brand">📊 ClientPM</span>
     <a href="/">Dashboard</a>
     <a href="/clients.html" class="active">Clients</a>
     <a href="/tasks.html">Tasks</a>
     <a href="/calendar.html">Calendar</a>
   </nav>
+  
   <div class="page">
     <div class="page-header">
       <div>
-        <h1>Clients</h1>
+        <h1>👥 Clients</h1>
         <p id="client-count">Loading...</p>
       </div>
-      <button class="btn" onclick="openCreateModal()">+ Add Client</button>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <input 
+          id="search-input" 
+          type="text" 
+          placeholder="🔍 Search clients..." 
+          style="padding: 10px 14px; border: 1px solid var(--gray-300); border-radius: var(--radius); width: 250px;"
+        />
+        <button class="btn" onclick="openCreateModal()">➕ Add Client</button>
+      </div>
     </div>
+    
     <div id="clients-list" class="clients-grid"></div>
   </div>
+
   <!-- Create / Edit modal -->
   <div class="modal-overlay" id="client-modal">
     <div class="modal-box">
       <h3 id="modal-title">Add Client</h3>
       <input type="hidden" id="edit-id" />
-      <label>Name *</label>
-      <input id="f-name" type="text" placeholder="Client name" />
+      
+      <label>Full Name *</label>
+      <input id="f-name" type="text" placeholder="John Doe" />
+      
       <label>Company</label>
-      <input id="f-company" type="text" placeholder="Company name" />
+      <input id="f-company" type="text" placeholder="Acme Inc." />
+      
       <div class="field-row">
         <div>
           <label>Email</label>
-          <input id="f-email" type="email" placeholder="email@domain.com" />
+          <input id="f-email" type="email" placeholder="john@example.com" />
         </div>
         <div>
           <label>Phone</label>
           <input id="f-phone" type="text" placeholder="+91 98765 43210" />
         </div>
       </div>
+      
       <label>Address</label>
-      <input id="f-address" type="text" placeholder="City, State" />
+      <input id="f-address" type="text" placeholder="City, State, Country" />
+      
       <label>Notes</label>
-      <textarea id="f-notes" rows="3" placeholder="Internal notes..."></textarea>
+      <textarea id="f-notes" rows="3" placeholder="Internal notes about this client..."></textarea>
+      
       <div class="modal-actions">
         <button class="btn outline" onclick="closeModal()">Cancel</button>
-        <button class="btn" id="save-btn" onclick="saveClient()">Create</button>
+        <button class="btn" id="save-btn" onclick="saveClient()">Create Client</button>
       </div>
     </div>
   </div>
+
   <!-- Delete confirm modal -->
   <div class="modal-overlay" id="delete-modal">
     <div class="modal-box" style="max-width: 380px;">
-      <h3>Delete Client</h3>
-      <p style="font-size: 14px; color: #6b7280;">This will permanently delete the client and all their tasks. This cannot be undone.</p>
+      <h3>⚠️ Delete Client</h3>
+      <p style="font-size: 14px; color: #6b7280; margin: 8px 0;">
+        This will permanently delete the client and <strong>all their tasks</strong>. 
+        This action cannot be undone.
+      </p>
       <div class="modal-actions">
         <button class="btn outline" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn danger" onclick="confirmDelete()">Delete</button>
+        <button class="btn danger" onclick="confirmDelete()">Delete Permanently</button>
       </div>
     </div>
   </div>
+
   <script src="/js/clients.js"></script>
 </body>
 </html>
