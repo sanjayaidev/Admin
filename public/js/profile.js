@@ -11,14 +11,15 @@ let userSettings = {};
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Profile] Page loaded');
   
-  // Check authentication
-  const authResult = await checkAuth();
-  if (!authResult.authenticated) {
-    showAuthModal();
+  // Check authentication using the global checkAuth from auth.js
+  const user = await window.checkAuth();
+  
+  if (!user) {
+    // User is not authenticated, show modal and wait for login
     return;
   }
   
-  currentUser = authResult.user;
+  currentUser = user;
   document.getElementById('mainContent').style.display = 'block';
   
   // Load profile data
@@ -27,11 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
   setupEventListeners();
 });
-
-// Show auth modal
-function showAuthModal() {
-  document.getElementById('authModal').style.display = 'flex';
-}
 
 // Setup event listeners
 function setupEventListeners() {
@@ -97,8 +93,12 @@ async function handleLogin(e) {
     
     if (response.ok) {
       console.log('[Profile] Login successful');
-      currentUser = data.user;
-      document.getElementById('authModal').style.display = 'none';
+      currentUser = data;
+      // Hide the inline auth modal in profile.html
+      const authModal = document.getElementById('authModal');
+      if (authModal) {
+        authModal.style.display = 'none';
+      }
       document.getElementById('mainContent').style.display = 'block';
       await loadProfileData();
     } else {
@@ -132,8 +132,12 @@ async function handleSignup(e) {
     
     if (response.ok) {
       console.log('[Profile] Signup successful');
-      currentUser = data.user;
-      document.getElementById('authModal').style.display = 'none';
+      currentUser = data;
+      // Hide the inline auth modal in profile.html
+      const authModal = document.getElementById('authModal');
+      if (authModal) {
+        authModal.style.display = 'none';
+      }
       document.getElementById('mainContent').style.display = 'block';
       await loadProfileData();
     } else {

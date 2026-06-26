@@ -1,37 +1,28 @@
+# Dependencies
+node_modules/
+
 # Logs and temp files
 *.log
+*.tmp
+*.swp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Dependencies
-node_modules/
-
 # Editors
 .vscode/
+.idea/
 
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-*.class
-*.exe
-*.dll
-*.so
-*.a
-*.out
-
-# Distribution / build directories
+# Build artifacts
 dist/
 build/
 target/
 
-# Python specific
-*.pyc
+# Python
 __pycache__/
+*.pyc
 *.pyo
 *.pyd
 .Python
@@ -48,9 +39,18 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-.git/modules/
+.git/refs/replace/
 .DS_Store
 Thumbs.db
+
+# Compiled and binary files
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.out
 
 # Compressed files
 *.zip
@@ -76,33 +76,368 @@ Thumbs.db
 *.tar.xz
 *.tar.zst
 
-# Test and coverage
+# Testing
 coverage/
 htmlcov/
-.nyc_output/
-istanbul.out
-*.lcov
-*.profraw
-*.profdata
-
-# IDE specific
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Gradle
-.gradle/
-
-# MyPy
+.pytest_cache/
 .mypy_cache/
 
-# PyTest
-.pytest_cache/
+# Java/Gradle
+.gradle/
+*.class
+*.jar
+*.war
+*.ear
 
-# VS Code
-.vscode/
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+vendor/
 
-# System files
-.DS_Store
-Thumbs.db
+# Ruby
+*.gem
+*.rbc
+capybara-*.html
+.rspec
+db/*.sqlite3
+db/*.sqlite3-journal
+public/system/*
+coverage/
+spec/reports/*
+spec/examples.txt
+tmp/
+*.orig
+vendor/bundle/
+.bundle/
+lib/bundler/man/
+
+# C/C++
+*.i
+*.ii
+*.s
+*.hi
+*.ilk
+*.pdb
+*.lib
+*.la
+*.gch
+*.pch
+*.xpi
+*.lo
+
+# Zig
+zig-cache/
+zig-out/
+
+# Julia
+julia-*/
+
+# Rust
+target/
+Cargo.lock
+
+# PHP
+vendor/
+composer.lock
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Elixir
+erl_crash.dump
+
+# Elm
+elm-stuff/
+**/elm-stuff
+
+# Haskell
+dist-newstyle/
+cabal.project.local
+cabal.project.local~
+*.o
+*.hi
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+
+# OCaml
+*.cmo
+*.cmi
+*.cma
+*.cmxa
+*.cmxs
+*.cmt
+*.cmti
+*.merlin
+_dbuild/
+_build/
+*.native
+*.byte
+*.cmx
+
+# PureScript
+.output/
+
+# Scala
+.classpath
+.project
+.scala_dependencies
+.worksheet
+
+# Tcl
+tclConfig.sh
+
+# Tcl/Tk
+*.exp
+
+# Visual Studio
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+ipch/
+*.iobj
+*.ipdb
+
+# CodeLite
+.codelite/
+.cxxlayout
+.bak/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# NetBeans
+nbproject/private/
+nbproject/project.bak
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+# Android
+*.keystore
+*.jks
+captures/
+*.dmg
+*.pid
+*.seed
+*.pid.lock
+*.sock
+*.out
+*.pid
+*.seed
+*.lock
+*.sock
+*.out
+*.pid
+*.seed
+*.lock
+*.sock
+*.out
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.pbxuser
+*.mode1v3
+*.perspectivev3
+*.xcuserstate
+*.xccheckout
+DerivedData/
+*.moved-aside
+*.xcuserdatad
+*.xcscmblueprint
+*.xcscheme
+*.xcschememanagement.plist
+*.xcsettings
+*.xcconfig
+*.xcstrings
+*.xclangformat
+*.xctemplate
+*.xcsynctransition
+*.xcsynctransitionset
+*.xcsynctransitioninfo
+*.xcsynctransitionsetinfo
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.......xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcs......synctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransitionsetinfo.plist
+*.xcsynctransitioninfo.plist
+*.xcsynctransition......
