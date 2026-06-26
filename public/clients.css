@@ -1,70 +1,76 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clients · ClientPM</title>
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="stylesheet" href="/clients.css" />
-</head>
-<body>
-  <nav class="navbar">
-    <span class="brand">ClientPM</span>
-    <a href="/">Dashboard</a>
-    <a href="/clients.html" class="active">Clients</a>
-    <a href="/tasks.html">Tasks</a>
-    <a href="/calendar.html">Calendar</a>
-  </nav>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1>Clients</h1>
-        <p id="client-count">Loading...</p>
-      </div>
-      <button class="btn" onclick="openCreateModal()">+ Add Client</button>
-    </div>
-    <div id="clients-list" class="clients-grid"></div>
-  </div>
-  <!-- Create / Edit modal -->
-  <div class="modal-overlay" id="client-modal">
-    <div class="modal-box">
-      <h3 id="modal-title">Add Client</h3>
-      <input type="hidden" id="edit-id" />
-      <label>Name *</label>
-      <input id="f-name" type="text" placeholder="Client name" />
-      <label>Company</label>
-      <input id="f-company" type="text" placeholder="Company name" />
-      <div class="field-row">
-        <div>
-          <label>Email</label>
-          <input id="f-email" type="email" placeholder="email@domain.com" />
-        </div>
-        <div>
-          <label>Phone</label>
-          <input id="f-phone" type="text" placeholder="+91 98765 43210" />
-        </div>
-      </div>
-      <label>Address</label>
-      <input id="f-address" type="text" placeholder="City, State" />
-      <label>Notes</label>
-      <textarea id="f-notes" rows="3" placeholder="Internal notes..."></textarea>
-      <div class="modal-actions">
-        <button class="btn outline" onclick="closeModal()">Cancel</button>
-        <button class="btn" id="save-btn" onclick="saveClient()">Create</button>
-      </div>
-    </div>
-  </div>
-  <!-- Delete confirm modal -->
-  <div class="modal-overlay" id="delete-modal">
-    <div class="modal-box" style="max-width: 380px;">
-      <h3>Delete Client</h3>
-      <p style="font-size: 14px; color: #6b7280;">This will permanently delete the client and all their tasks. This cannot be undone.</p>
-      <div class="modal-actions">
-        <button class="btn outline" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn danger" onclick="confirmDelete()">Delete</button>
-      </div>
-    </div>
-  </div>
-  <script src="/js/clients.js"></script>
-</body>
-</html>
+/* Clients-specific styles */
+/* Center-align content in client cards */
+.client-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.client-card-header {
+  width: 100%;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+.client-card h3 {
+  text-align: center;
+}
+.client-company {
+  text-align: center;
+}
+.client-info {
+  align-items: center;
+  width: 100%;
+}
+.client-info-item {
+  justify-content: center;
+}
+/* Client grid layout */
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  justify-items: center;
+}
+/* Modal form centered labels and inputs */
+.modal-box label {
+  text-align: center;
+}
+.modal-box input,
+.modal-box select,
+.modal-box textarea {
+  text-align: center;
+}
+/* Action buttons centered in card */
+.client-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-100);
+  justify-content: center;
+  width: 100%;
+}
+/* Page header centered */
+.page-header {
+  text-align: center;
+  justify-content: center;
+}
+.page-header h1,
+.page-header p {
+  text-align: center;
+}
+/* Client count centered */
+#client-count {
+  text-align: center;
+}
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .client-card {
+    max-width: 400px;
+    width: 100%;
+  }
+}
