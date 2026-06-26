@@ -9,7 +9,6 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const { URL } = require('url');
-const cors = require('cors');
 const fs = require('fs');
 
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
