@@ -12,14 +12,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Profile] Page loaded');
   
   // Check authentication using the global checkAuth from auth.js
-  const user = await window.checkAuth();
+  const authResult = await window.checkAuth();
   
-  if (!user) {
+  if (!authResult.authenticated) {
     // User is not authenticated, show modal and wait for login
+    showAuthModal();
     return;
   }
   
-  currentUser = user;
+  currentUser = authResult.user;
   document.getElementById('mainContent').style.display = 'block';
   
   // Load profile data
@@ -94,6 +95,12 @@ async function handleLogin(e) {
     if (response.ok) {
       console.log('[Profile] Login successful');
       currentUser = data;
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       // Hide the inline auth modal in profile.html
       const authModal = document.getElementById('authModal');
       if (authModal) {
@@ -133,6 +140,12 @@ async function handleSignup(e) {
     if (response.ok) {
       console.log('[Profile] Signup successful');
       currentUser = data;
+      
+      // Store auth token in session storage
+      if (data.token) {
+        sessionStorage.setItem('auth_token', data.token);
+      }
+      
       // Hide the inline auth modal in profile.html
       const authModal = document.getElementById('authModal');
       if (authModal) {
@@ -159,6 +172,9 @@ async function handleLogout() {
       method: 'POST',
       credentials: 'include'
     });
+    
+    // Clear auth token from session storage
+    sessionStorage.removeItem('auth_token');
     
     window.location.href = '/';
   } catch (error) {
