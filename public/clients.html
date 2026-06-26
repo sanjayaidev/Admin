@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="/clients.css" />
 </head>
 <body>
-
   <nav class="navbar">
     <span class="brand">ClientPM</span>
     <a href="/">Dashboard</a>
@@ -16,7 +15,6 @@
     <a href="/tasks.html">Tasks</a>
     <a href="/calendar.html">Calendar</a>
   </nav>
-
   <div class="page">
     <div class="page-header">
       <div>
@@ -25,19 +23,17 @@
       </div>
       <button class="btn" onclick="openCreateModal()">+ Add Client</button>
     </div>
-
     <div id="clients-list"></div>
   </div>
-
   <!-- Create / Edit modal -->
   <div class="modal-overlay" id="client-modal">
     <div class="modal-box">
       <h3 id="modal-title">Add Client</h3>
       <input type="hidden" id="edit-id" />
       <label>Name *</label>
-      <input id="f-name" placeholder="Client name" />
+      <input id="f-name" type="text" placeholder="Client name" />
       <label>Company</label>
-      <input id="f-company" placeholder="Company name" />
+      <input id="f-company" type="text" placeholder="Company name" />
       <div class="field-row">
         <div>
           <label>Email</label>
@@ -45,11 +41,11 @@
         </div>
         <div>
           <label>Phone</label>
-          <input id="f-phone" placeholder="+91 98765 43210" />
+          <input id="f-phone" type="text" placeholder="+91 98765 43210" />
         </div>
       </div>
       <label>Address</label>
-      <input id="f-address" placeholder="City, State" />
+      <input id="f-address" type="text" placeholder="City, State" />
       <label>Notes</label>
       <textarea id="f-notes" rows="3" placeholder="Internal notes..."></textarea>
       <div class="modal-actions">
@@ -58,7 +54,6 @@
       </div>
     </div>
   </div>
-
   <!-- Delete confirm modal -->
   <div class="modal-overlay" id="delete-modal">
     <div class="modal-box" style="max-width: 380px;">
@@ -70,7 +65,6 @@
       </div>
     </div>
   </div>
-
   <script src="/js/clients.js"></script>
 </body>
 </html>
