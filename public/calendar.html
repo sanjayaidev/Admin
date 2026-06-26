@@ -3,120 +3,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calendar · ClientPM</title>
+  <title>Clients · ClientPM</title>
   <link rel="stylesheet" href="/style.css" />
-  <link rel="stylesheet" href="/calendar.css" />
+  <link rel="stylesheet" href="/clients.css" />
 </head>
 <body>
-
   <nav class="navbar">
     <span class="brand">ClientPM</span>
     <a href="/">Dashboard</a>
-    <a href="/clients.html">Clients</a>
+    <a href="/clients.html" class="active">Clients</a>
     <a href="/tasks.html">Tasks</a>
-    <a href="/calendar.html" class="active">Calendar</a>
+    <a href="/calendar.html">Calendar</a>
   </nav>
-
   <div class="page">
     <div class="page-header">
       <div>
-        <h1>Calendar</h1>
-        <p id="event-count">Loading...</p>
+        <h1>Clients</h1>
+        <p id="client-count">Loading...</p>
       </div>
-      <button class="btn" onclick="openCreateModal()">+ Add Event</button>
+      <button class="btn" onclick="openCreateModal()">+ Add Client</button>
     </div>
-
-    <!-- Filters -->
-    <div class="filters-bar" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:center;">
-      <select id="filter-client" onchange="loadEvents()">
-        <option value="">All Clients</option>
-      </select>
-      <select id="filter-type" onchange="render()">
-        <option value="">All Types</option>
-        <option value="task">Tasks</option>
-        <option value="meeting">Meetings</option>
-        <option value="deadline">Deadlines</option>
-      </select>
-    </div>
-
-    <!-- Calendar View Controls -->
-    <div class="calendar-header">
-      <div class="calendar-nav">
-        <button class="btn outline" onclick="previousPeriod()">← Prev</button>
-        <span class="month-name" id="current-period"></span>
-        <button class="btn outline" onclick="nextPeriod()">Next →</button>
-        <button class="btn outline" onclick="goToToday()">Today</button>
-      </div>
-      <div class="view-toggle">
-        <button class="active" data-view="month" onclick="setView('month')">Month</button>
-        <button data-view="week" onclick="setView('week')">Week</button>
-      </div>
-    </div>
-
-    <!-- Month View Grid -->
-    <div id="month-view">
-      <div class="calendar-grid" id="calendar-grid"></div>
-    </div>
-
-    <!-- Week View (simplified as list) -->
-    <div id="week-view" style="display:none;" class="event-list"></div>
-
-    <!-- Event List Below Calendar -->
-    <div class="event-list" id="event-list"></div>
+    <div id="clients-list" class="clients-grid"></div>
   </div>
-
-  <!-- Create / Edit Event Modal -->
-  <div class="modal-overlay" id="event-modal">
+  <!-- Create / Edit modal -->
+  <div class="modal-overlay" id="client-modal">
     <div class="modal-box">
-      <h3 id="modal-title">Add Event</h3>
+      <h3 id="modal-title">Add Client</h3>
       <input type="hidden" id="edit-id" />
-      
-      <label>Title *</label>
-      <input id="f-title" placeholder="Event title" />
-      
-      <label>Description</label>
-      <textarea id="f-description" rows="3" placeholder="Event details..."></textarea>
-      
+      <label>Name *</label>
+      <input id="f-name" type="text" placeholder="Client name" />
+      <label>Company</label>
+      <input id="f-company" type="text" placeholder="Company name" />
       <div class="field-row">
         <div>
-          <label>Date & Time *</label>
-          <input id="f-event-date" type="datetime-local" />
+          <label>Email</label>
+          <input id="f-email" type="email" placeholder="email@domain.com" />
         </div>
         <div>
-          <label>Type</label>
-          <select id="f-event-type">
-            <option value="task">Task</option>
-            <option value="meeting">Meeting</option>
-            <option value="deadline">Deadline</option>
-          </select>
+          <label>Phone</label>
+          <input id="f-phone" type="text" placeholder="+91 98765 43210" />
         </div>
       </div>
-      
-      <label>Link to Task (optional)</label>
-      <select id="f-work-item">
-        <option value="">No link</option>
-      </select>
-      
+      <label>Address</label>
+      <input id="f-address" type="text" placeholder="City, State" />
+      <label>Notes</label>
+      <textarea id="f-notes" rows="3" placeholder="Internal notes..."></textarea>
       <div class="modal-actions">
         <button class="btn outline" onclick="closeModal()">Cancel</button>
-        <button class="btn" id="save-btn" onclick="saveEvent()">Create</button>
+        <button class="btn" id="save-btn" onclick="saveClient()">Create</button>
       </div>
     </div>
   </div>
-
   <!-- Delete confirm modal -->
   <div class="modal-overlay" id="delete-modal">
     <div class="modal-box" style="max-width: 380px;">
-      <h3>Delete Event</h3>
-      <p style="font-size: 14px; color: #6b7280;">This will permanently delete this event.</p>
+      <h3>Delete Client</h3>
+      <p style="font-size: 14px; color: #6b7280;">This will permanently delete the client and all their tasks. This cannot be undone.</p>
       <div class="modal-actions">
         <button class="btn outline" onclick="closeDeleteModal()">Cancel</button>
         <button class="btn danger" onclick="confirmDelete()">Delete</button>
       </div>
     </div>
   </div>
-
-  <script src="/js/utils.js"></script>
-  <script src="/js/calendar.js"></script>
+  <script src="/js/clients.js"></script>
 </body>
 </html>
