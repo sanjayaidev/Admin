@@ -234,5 +234,4 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Initialize
-loadTasks();
+// Initialize - loadTasks() is now called from auth.js after authentication check

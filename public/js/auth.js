@@ -69,20 +69,6 @@ function showAppContent(user) {
   
   // Show user info in navbar
   updateNavbar(user);
-  
-  // Load app data
-  if (typeof loadDashboard === 'function') {
-    loadDashboard();
-  }
-  if (typeof loadClients === 'function') {
-    loadClients();
-  }
-  if (typeof loadTasks === 'function') {
-    loadTasks();
-  }
-  if (typeof initCalendar === 'function') {
-    initCalendar();
-  }
 }
 
 // Update navbar with user info
@@ -362,14 +348,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Initialize auth check when DOM is ready
-document.addEventListener('DOMContentLoaded', async function() {
-  // Check if user is authenticated
-  await checkAuth();
-  
-  // If any page has data loading functions, they'll be called after auth
-});
-
 // Make auth functions globally available
 window.login = login;
 window.signup = signup;
@@ -378,3 +356,45 @@ window.checkAuth = checkAuth;
 window.switchAuthTab = switchAuthTab;
 window.showAuthModal = showAuthModal;
 window.updateNavbar = updateNavbar;
+window.showAppContent = showAppContent;
+
+// Initialize auth check when DOM is ready
+document.addEventListener('DOMContentLoaded', async function() {
+  // Check if user is authenticated
+  const authResult = await checkAuth();
+  
+  if (!authResult.authenticated) {
+    // User is not authenticated, show the auth modal
+    showAuthModal();
+    return;
+  }
+  
+  // User is authenticated, update navbar and load page-specific data
+  currentUser = authResult.user;
+  updateNavbar(currentUser);
+  
+  // Call page-specific init function if it exists
+  if (typeof loadDashboard === 'function') {
+    loadDashboard();
+  }
+  if (typeof loadClients === 'function') {
+    loadClients();
+  }
+  if (typeof loadTasks === 'function') {
+    loadTasks();
+  }
+  if (typeof initCalendar === 'function') {
+    initCalendar();
+  }
+  if (typeof loadTeamMembers === 'function') {
+    loadTeamMembers();
+    loadWorkloadData();
+  }
+  if (typeof loadUserSettings === 'function') {
+    loadUserSettings();
+    loadIntegrations();
+  }
+  if (typeof loadProfileData === 'function') {
+    loadProfileData();
+  }
+});

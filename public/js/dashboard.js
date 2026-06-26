@@ -168,4 +168,4 @@ function escapeHtml(str) {
 }
 
 // ---- Init ----
-loadDashboard();
+// loadDashboard() is now called from auth.js after authentication check
