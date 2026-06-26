@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - ClientPM</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/profile.css">
+</head>
+<body>
+  <!-- Auth Modal -->
+  <div id="authModal" class="modal">
+    <div class="modal-content auth-modal">
+      <h2>Authentication Required</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+      </form>
+      <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+      
+      <form id="signupForm" style="display: none;">
+        <div class="form-group">
+          <label for="signupName">Full Name</label>
+          <input type="text" id="signupName" required>
+        </div>
+        <div class="form-group">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" required>
+        </div>
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary">Sign Up</button>
+      </form>
+      <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Login</a></p>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="mainContent" style="display: none;">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-brand">ClientPM</div>
+      <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/clients.html">Clients</a>
+        <a href="/tasks.html">Tasks</a>
+        <a href="/calendar.html">Calendar</a>
+        <a href="/invoices.html">Invoices</a>
+        <a href="/team.html">Team</a>
+        <a href="/settings.html">Settings</a>
+        <a href="/profile.html" class="active">Profile</a>
+        <button id="logoutBtn" class="btn btn-outline">Logout</button>
+      </div>
+    </nav>
+
+    <div class="container">
+      <h1>My Profile</h1>
+
+      <!-- Profile Header with Avatar -->
+      <section class="profile-header">
+        <div class="avatar-section">
+          <div class="avatar-preview" id="avatarPreview">
+            <span class="avatar-placeholder">👤</span>
+          </div>
+          <div class="avatar-actions">
+            <label for="avatarUpload" class="btn btn-outline btn-sm">Change Avatar</label>
+            <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+            <button id="removeAvatarBtn" class="btn btn-danger btn-sm" style="display: none;">Remove</button>
+          </div>
+        </div>
+        <div class="profile-info">
+          <h2 id="profileName">Loading...</h2>
+          <p id="profileEmail" class="text-muted">Loading...</p>
+          <span id="profileRole" class="badge">Loading...</span>
+        </div>
+      </section>
+
+      <!-- Personal Information -->
+      <section class="profile-section">
+        <h2>📝 Personal Information</h2>
+        <form id="profileForm" class="profile-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName">Full Name *</label>
+              <input type="text" id="fullName" required>
+            </div>
+            <div class="form-group">
+              <label for="email">Email Address *</label>
+              <input type="email" id="email" required>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" placeholder="+1 (555) 123-4567">
+            </div>
+            <div class="form-group">
+              <label for="role">Role</label>
+              <input type="text" id="role" disabled class="disabled-input">
+              <small class="form-hint">Contact admin to change role</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bio">Bio / About</label>
+            <textarea id="bio" rows="3" placeholder="Tell us about yourself..."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+      </section>
+
+      <!-- Change Password -->
+      <section class="profile-section">
+        <h2>🔐 Change Password</h2>
+        <form id="passwordForm" class="profile-form">
+          <div class="form-group">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" required>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <input type="password" id="newPassword" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirm New Password</label>
+              <input type="password" id="confirmPassword" required minlength="6">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+      </section>
+
+      <!-- Notification Preferences -->
+      <section class="profile-section">
+        <h2>🔔 Notification Preferences</h2>
+        <form id="notificationPrefsForm" class="profile-form">
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="prefEmailNotifications">
+              <span>Email Notifications</span>
+            </label>
+            <p class="checkbox-description">Receive updates and alerts via email</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="prefWhatsappNotifications">
+              <span>WhatsApp Notifications</span>
+            </label>
+            <p class="checkbox-description">Receive urgent notifications via WhatsApp</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="prefTaskAssignments">
+              <span>Task Assignment Alerts</span>
+            </label>
+            <p class="checkbox-description">Get notified when assigned to new tasks</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="prefMentions">
+              <span>Mention Notifications</span>
+            </label>
+            <p class="checkbox-description">Get notified when mentioned in comments</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save Preferences</button>
+        </form>
+      </section>
+
+      <!-- Google Account Connections -->
+      <section class="profile-section">
+        <h2>🔗 Connected Google Accounts</h2>
+        <p class="section-description">Manage your Google service connections for this account.</p>
+        
+        <div class="integration-list" id="googleConnections">
+          <!-- Populated dynamically -->
+          <div class="loading-state">Loading connections...</div>
+        </div>
+        
+        <div class="section-actions">
+          <a href="/settings.html" class="btn btn-outline">Manage All Integrations</a>
+        </div>
+      </section>
+
+      <!-- Activity History -->
+      <section class="profile-section">
+        <h2>📊 Recent Activity</h2>
+        <div class="activity-list" id="activityList">
+          <!-- Populated dynamically -->
+          <div class="loading-state">Loading activity...</div>
+        </div>
+      </section>
+
+      <!-- Danger Zone -->
+      <section class="profile-section danger-zone">
+        <h2>⚠️ Danger Zone</h2>
+        <p class="section-description">Irreversible actions for your account.</p>
+        
+        <div class="danger-actions">
+          <button id="deactivateAccountBtn" class="btn btn-warning">Deactivate Account</button>
+          <button id="deleteAccountBtn" class="btn btn-danger" disabled>Delete Account (Admin Only)</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>

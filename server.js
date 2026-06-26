@@ -13,6 +13,7 @@ const cors = require('cors');
 const fs = require('fs');
 
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
+const { logger, errorLogger } = require('./middleware/logger');
 const { 
   createUser, 
   authenticateUser, 

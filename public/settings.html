@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - ClientPM</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+  <!-- Auth Modal -->
+  <div id="authModal" class="modal">
+    <div class="modal-content auth-modal">
+      <h2>Authentication Required</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+      </form>
+      <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+      
+      <form id="signupForm" style="display: none;">
+        <div class="form-group">
+          <label for="signupName">Full Name</label>
+          <input type="text" id="signupName" required>
+        </div>
+        <div class="form-group">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" required>
+        </div>
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary">Sign Up</button>
+      </form>
+      <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Login</a></p>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="mainContent" style="display: none;">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-brand">ClientPM</div>
+      <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/clients.html">Clients</a>
+        <a href="/tasks.html">Tasks</a>
+        <a href="/calendar.html">Calendar</a>
+        <a href="/invoices.html">Invoices</a>
+        <a href="/team.html">Team</a>
+        <a href="/settings.html" class="active">Settings</a>
+        <a href="/profile.html">Profile</a>
+        <button id="logoutBtn" class="btn btn-outline">Logout</button>
+      </div>
+    </nav>
+
+    <div class="container">
+      <h1>Settings</h1>
+
+      <!-- Google Integrations Section -->
+      <section class="settings-section">
+        <h2>🔗 Google Integrations</h2>
+        <p class="section-description">Connect your Google account to enable calendar sync, file storage, and more.</p>
+        
+        <div class="integration-grid">
+          <!-- Google Calendar -->
+          <div class="integration-card" data-service="google_calendar">
+            <div class="integration-icon">📅</div>
+            <h3>Google Calendar</h3>
+            <p>Sync events and meetings</p>
+            <div class="integration-status">
+              <span class="status-badge disconnected">Disconnected</span>
+            </div>
+            <button class="btn btn-connect">Connect</button>
+            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+          </div>
+
+          <!-- Google Drive -->
+          <div class="integration-card" data-service="google_drive">
+            <div class="integration-icon">📁</div>
+            <h3>Google Drive</h3>
+            <p>Store client files and documents</p>
+            <div class="integration-status">
+              <span class="status-badge disconnected">Disconnected</span>
+            </div>
+            <button class="btn btn-connect">Connect</button>
+            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+          </div>
+
+          <!-- Google Sheets -->
+          <div class="integration-card" data-service="google_sheets">
+            <div class="integration-icon">📊</div>
+            <h3>Google Sheets</h3>
+            <p>Export reports and data</p>
+            <div class="integration-status">
+              <span class="status-badge disconnected">Disconnected</span>
+            </div>
+            <button class="btn btn-connect">Connect</button>
+            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+          </div>
+
+          <!-- Gmail / Apps Script -->
+          <div class="integration-card" data-service="gmail">
+            <div class="integration-icon">📧</div>
+            <h3>Gmail (Apps Script)</h3>
+            <p>Send emails via Apps Script</p>
+            <div class="integration-status">
+              <span class="status-badge disconnected">Disconnected</span>
+            </div>
+            <button class="btn btn-connect">Connect</button>
+            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+          </div>
+
+          <!-- Google Meet -->
+          <div class="integration-card" data-service="google_meet">
+            <div class="integration-icon">🎥</div>
+            <h3>Google Meet</h3>
+            <p>Generate meeting links</p>
+            <div class="integration-status">
+              <span class="status-badge disconnected">Disconnected</span>
+            </div>
+            <button class="btn btn-connect">Connect</button>
+            <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- WhatsApp Integration -->
+      <section class="settings-section">
+        <h2>💬 WhatsApp Integration (GOWA)</h2>
+        <p class="section-description">Configure WhatsApp messaging for notifications.</p>
+        
+        <form id="gowaForm" class="settings-form">
+          <div class="form-group">
+            <label for="gowaApiUrl">GOWA API URL</label>
+            <input type="url" id="gowaApiUrl" placeholder="https://api.gowa.com/v1">
+          </div>
+          <div class="form-group">
+            <label for="gowaApiKey">GOWA API Key</label>
+            <input type="password" id="gowaApiKey" placeholder="Your API key">
+          </div>
+          <button type="submit" class="btn btn-primary">Save WhatsApp Settings</button>
+          <button type="button" id="testWhatsappBtn" class="btn btn-outline">Test Connection</button>
+        </form>
+      </section>
+
+      <!-- Notification Preferences -->
+      <section class="settings-section">
+        <h2>🔔 Notification Preferences</h2>
+        <p class="section-description">Choose how you want to receive notifications.</p>
+        
+        <form id="notificationForm" class="settings-form">
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="emailNotifications" checked>
+              <span>Email Notifications</span>
+            </label>
+            <p class="checkbox-description">Receive daily summaries, overdue reminders, and invoice alerts via email.</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="whatsappNotifications">
+              <span>WhatsApp Notifications</span>
+            </label>
+            <p class="checkbox-description">Receive urgent notifications via WhatsApp (requires GOWA setup).</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="overdueReminders" checked>
+              <span>Overdue Task Reminders</span>
+            </label>
+            <p class="checkbox-description">Daily reminders at 8:00 AM for overdue tasks.</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="upcomingReminders" checked>
+              <span>Upcoming Task Reminders</span>
+            </label>
+            <p class="checkbox-description">24-hour advance notifications for upcoming deadlines.</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="invoiceReminders" checked>
+              <span>Invoice Due Reminders</span>
+            </label>
+            <p class="checkbox-description">Reminders 3 days before invoice due dates.</p>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="weeklyDigest" checked>
+              <span>Weekly Digest</span>
+            </label>
+            <p class="checkbox-description">Every Monday at 9:00 AM with project summary.</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save Preferences</button>
+        </form>
+      </section>
+
+      <!-- Invoice Settings -->
+      <section class="settings-section">
+        <h2>📄 Invoice Settings</h2>
+        <p class="section-description">Configure invoice generation and payment settings.</p>
+        
+        <form id="invoiceForm" class="settings-form">
+          <div class="form-group">
+            <label for="invoicePrefix">Invoice Number Prefix</label>
+            <input type="text" id="invoicePrefix" value="INV" placeholder="INV">
+          </div>
+          <div class="form-group">
+            <label for="taxRate">Tax Rate (%)</label>
+            <input type="number" id="taxRate" value="18" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label for="currency">Currency</label>
+            <select id="currency">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="INR">INR (₹)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="paymentTerms">Default Payment Terms (days)</label>
+            <input type="number" id="paymentTerms" value="30" min="1">
+          </div>
+          <button type="submit" class="btn btn-primary">Save Invoice Settings</button>
+        </form>
+      </section>
+
+      <!-- System Settings -->
+      <section class="settings-section">
+        <h2>⚙️ System Settings</h2>
+        <p class="section-description">General application configuration.</p>
+        
+        <form id="systemForm" class="settings-form">
+          <div class="form-group">
+            <label for="appName">Application Name</label>
+            <input type="text" id="appName" value="ClientPM">
+          </div>
+          <div class="form-group">
+            <label for="timezone">Timezone</label>
+            <select id="timezone">
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">Eastern Time (ET)</option>
+              <option value="America/Chicago">Central Time (CT)</option>
+              <option value="America/Los_Angeles">Pacific Time (PT)</option>
+              <option value="Europe/London">London (GMT)</option>
+              <option value="Europe/Paris">Paris (CET)</option>
+              <option value="Asia/Kolkata">India (IST)</option>
+              <option value="Asia/Tokyo">Tokyo (JST)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Save System Settings</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>
