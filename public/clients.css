@@ -1,20 +1,113 @@
 /* Clients-specific styles */
 
-/* Client grid layout - override base style from style.css */
+/* Client grid layout */
 .clients-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
+  width: 100%;
+}
+
+.client-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  word-break: break-word;
+}
+
+.client-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.client-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  width: 100%;
+  gap: 8px;
+}
+
+.client-card h3 {
+  font-size: 1.125rem;
+  margin-bottom: 4px;
+  word-break: break-word;
+  flex: 1;
+}
+
+.client-company {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+
+.client-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  width: 100%;
+  flex: 1;
+}
+
+.client-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gray-600);
+  word-break: break-word;
+}
+
+.client-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-100);
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .clients-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .client-card {
-    max-width: 400px;
+    max-width: 100%;
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .clients-grid {
+    gap: 12px;
+  }
+
+  .client-card {
+    padding: 16px;
+    min-height: 160px;
+  }
+  
+  .client-card-actions {
+    flex-direction: column;
     width: 100%;
+  }
+  
+  .client-card-actions .btn {
+    width: 100%;
+    justify-content: center;
   }
 }
