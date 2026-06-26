@@ -1,5 +1,4 @@
 /* Tasks-specific styles */
-
 /* Center-align content in task cards */
 .task-card {
   text-align: center;
@@ -7,30 +6,24 @@
   flex-direction: column;
   align-items: center;
 }
-
 .task-card-header {
   width: 100%;
   justify-content: center;
   flex-direction: column;
   align-items: center;
 }
-
 .task-title {
   text-align: center;
 }
-
 .task-client {
   text-align: center;
 }
-
 .task-meta {
   justify-content: center;
 }
-
 .task-meta-item {
   justify-content: center;
 }
-
 /* Task actions centered */
 .task-actions {
   display: flex;
@@ -38,7 +31,6 @@
   justify-content: center;
   width: 100%;
 }
-
 /* Filters bar - horizontal alignment for dropdowns */
 .filters-bar {
   display: flex;
@@ -48,38 +40,36 @@
   align-items: center;
   justify-content: center;
 }
-
 .filters-bar select {
+  /* FIX: global `select { width: 100% }` was forcing each dropdown onto
+     its own row inside this flex container, making it look vertical
+     even though display:flex was already set above. */
+  width: auto;
+  flex: 0 1 180px;
   min-width: 150px;
 }
-
 /* Page header centered */
 .page-header {
   text-align: center;
   justify-content: center;
 }
-
 .page-header h1,
 .page-header p {
   text-align: center;
 }
-
 /* Task count centered */
 #task-count {
   text-align: center;
 }
-
 /* Modal form centered labels and inputs */
 .modal-box label {
   text-align: center;
 }
-
 .modal-box input,
 .modal-box select,
 .modal-box textarea {
   text-align: center;
 }
-
 /* Field rows centered */
 .field-row {
   display: grid;
@@ -87,7 +77,6 @@
   gap: 16px;
   width: 100%;
 }
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .filters-bar {
