@@ -1,1 +1,3 @@
-(public/style.css and public/clients.css are source files, not build artifacts or dependencies)
+```
+node_modules/
+```
