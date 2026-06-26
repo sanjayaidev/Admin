@@ -1,16 +1,29 @@
 // server.js — Unified router for ClientPM
 // Single Node.js server serving static HTML/CSS/JS + API endpoints
-// No TypeScript, no framework — plain HTML/CSS/JS frontend
+// With full authentication and role-based access control
 
 require('dotenv').config();
 
-const http = require('http');
-const fs = require('fs');
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const { URL } = require('url');
 const cors = require('cors');
+const fs = require('fs');
+
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
 const { logger, errorLogger } = require('./middleware/logger');
+const { 
+  createUser, 
+  authenticateUser, 
+  createSession, 
+  validateSession, 
+  deleteSession,
+  getUserById,
+  hasRole
+} = require('./lib/auth');
+const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 
 // Redis client setup
 const { createClient } = require('redis');
@@ -42,6 +55,25 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
+const app = express();
+const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// ============ MIDDLEWARE ============
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Parse cookies
+app.use(cookieParser());
+
+// Enable CORS for development
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? process.env.APP_URL : 'http://localhost:3000',
+  credentials: true
+}));
+
+// ============ DATABASE INITIALIZATION ============
 
 // Initialize database connection and run migrations on startup
 if (process.env.NODE_ENV === 'production') {
@@ -51,150 +83,234 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// MIME types for static files
-const MIME_TYPES = {
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'application/javascript',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
-};
+// ============ AUTH ROUTES (Public) ============
 
-// Parse JSON body from request
-function parseBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        resolve(body ? JSON.parse(body) : {});
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-}
-
-// Send JSON response
-function sendJSON(res, statusCode, data) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(data));
-}
-
-// Serve static file
-function serveStatic(res, filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-  
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        res.writeHead(404);
-        res.end('File not found');
-      } else {
-        res.writeHead(500);
-        res.end('Server error');
-      }
-    } else {
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
-    }
-  });
-}
-
-// API: Clients
-async function handleClients(req, res, method) {
-  await migrate();
-  
-  if (method === 'GET') {
-    const { rows } = await pool.query('SELECT * FROM clients ORDER BY created_at DESC');
-    return sendJSON(res, 200, rows);
-  }
-  
-  if (method === 'POST') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
     
-    const { name, email, phone, company, address, notes } = body;
-    if (!name || !name.trim()) {
-      return sendJSON(res, 400, { error: 'Name is required' });
+    const user = await authenticateUser(email, password);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
+    
+    const token = await createSession(user.id);
+    
+    res.cookie('session_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
+    res.json({
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Signup
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { fullName, email, password, role } = req.body;
+    
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ error: 'Full name, email, and password are required' });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    
+    if (role && !['admin', 'team', 'client'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    const user = await createUser(email, password, fullName, role || 'team');
+    const token = await createSession(user.id);
+    
+    res.cookie('session_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+    
+    res.status(201).json({
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    if (error.code === '23505' && error.constraint === 'users_email_key') {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get current user (auto-login check)
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const token = req.cookies.session_token;
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const user = await validateSession(token);
+    if (!user) {
+      res.clearCookie('session_token');
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+    
+    res.json({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role
+    });
+  } catch (error) {
+    console.error('Auth check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const token = req.cookies.session_token;
+    if (token) {
+      await deleteSession(token);
+    }
+    res.clearCookie('session_token');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============ PROTECTED API ROUTES ============
+
+// All API routes below require authentication
+app.use('/api/*', requireAuth);
+
+// Get all clients
+app.get('/api/clients', async (req, res) => {
+  try {
+    await migrate();
+    const { rows } = await pool.query('SELECT * FROM clients ORDER BY created_at DESC');
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create client
+app.post('/api/clients', async (req, res) => {
+  try {
+    await migrate();
+    const { name, email, phone, company, address, notes } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    
     const slug = await makeUniqueSlug(name);
     const { rows } = await pool.query(
       `INSERT INTO clients (name, email, phone, company, address, notes, slug, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NULL) RETURNING *`,
-      [name, email || null, phone || null, company || null, address || null, notes || null, slug]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [name.trim(), email || null, phone || null, company || null, address || null, notes || null, slug, req.user.id]
     );
-    return sendJSON(res, 201, rows[0]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating client:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Single Client by ID
-async function handleClientById(req, res, method, id) {
-  await migrate();
-  
-  if (method === 'GET') {
+// Get single client
+app.get('/api/clients/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
     const { rows } = await pool.query('SELECT * FROM clients WHERE id = $1', [id]);
+    
     if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Client not found' });
+      return res.status(404).json({ error: 'Client not found' });
     }
-    return sendJSON(res, 200, rows[0]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching client:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'PUT') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
+});
+
+// Update client
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { name, email, phone, company, address, notes } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
     }
     
-    const { name, email, phone, company, address, notes } = body;
-    if (!name || !name.trim()) {
-      return sendJSON(res, 400, { error: 'Name is required' });
-    }
     const { rows } = await pool.query(
-      `UPDATE clients SET name=$1, email=$2, phone=$3, company=$4, address=$5, notes=$6, updated_at=CURRENT_TIMESTAMP
+      `UPDATE clients 
+       SET name=$1, email=$2, phone=$3, company=$4, address=$5, notes=$6, updated_at=CURRENT_TIMESTAMP
        WHERE id=$7 RETURNING *`,
-      [name, email || null, phone || null, company || null, address || null, notes || null, id]
+      [name.trim(), email || null, phone || null, company || null, address || null, notes || null, id]
     );
+    
     if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Client not found' });
+      return res.status(404).json({ error: 'Client not found' });
     }
-    return sendJSON(res, 200, rows[0]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating client:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'DELETE') {
-    const { rows } = await pool.query('DELETE FROM clients WHERE id=$1 RETURNING id', [id]);
-    if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Client not found' });
-    }
-    return sendJSON(res, 200, { deleted: true });
-  }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Work Items (Tasks)
-async function handleWorkItems(req, res, method) {
-  await migrate();
-  
-  if (method === 'GET') {
-    const urlObj = new URL(req.url, `http://localhost:${PORT}`);
-    const clientId = urlObj.searchParams.get('client_id');
-    const status = urlObj.searchParams.get('status');
-    const paymentStatus = urlObj.searchParams.get('payment_status');
+// Delete client (requires admin)
+app.delete('/api/clients/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { rows } = await pool.query('DELETE FROM clients WHERE id=$1 RETURNING id', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all work items
+app.get('/api/work-items', async (req, res) => {
+  try {
+    await migrate();
+    const { client_id, status, payment_status } = req.query;
     
     let query = `
       SELECT w.*, c.name AS client_name, c.slug AS client_slug
@@ -205,9 +321,9 @@ async function handleWorkItems(req, res, method) {
     const params = [];
     let paramIndex = 1;
     
-    if (clientId) {
+    if (client_id) {
       query += ` AND w.client_id = $${paramIndex}`;
-      params.push(clientId);
+      params.push(client_id);
       paramIndex++;
     }
     if (status) {
@@ -215,47 +331,49 @@ async function handleWorkItems(req, res, method) {
       params.push(status);
       paramIndex++;
     }
-    if (paymentStatus) {
+    if (payment_status) {
       query += ` AND w.payment_status = $${paramIndex}`;
-      params.push(paymentStatus);
+      params.push(payment_status);
       paramIndex++;
     }
     
     query += ' ORDER BY w.due_date ASC NULLS LAST, w.created_at DESC';
     
     const { rows } = await pool.query(query, params);
-    return sendJSON(res, 200, rows);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching work items:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'POST') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
-    }
+});
+
+// Create work item
+app.post('/api/work-items', async (req, res) => {
+  try {
+    await migrate();
+    const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = req.body;
     
-    const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = body;
     if (!client_id || !title) {
-      return sendJSON(res, 400, { error: 'client_id and title are required' });
+      return res.status(400).json({ error: 'client_id and title are required' });
     }
     
     const { rows } = await pool.query(
       `INSERT INTO work_items (client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL) RETURNING *`,
-      [client_id, title, description || null, status || 'pending', priority || 'medium', due_date || null, amount || null, payment_status || 'unpaid', assigned_to || null]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [client_id, title.trim(), description || null, status || 'pending', priority || 'medium', due_date || null, amount || null, payment_status || 'unpaid', assigned_to || null, req.user.id]
     );
-    return sendJSON(res, 201, rows[0]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating work item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Single Work Item by ID
-async function handleWorkItemById(req, res, method, id) {
-  await migrate();
-  
-  if (method === 'GET') {
+// Get single work item
+app.get('/api/work-items/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
     const { rows } = await pool.query(
       `SELECT w.*, c.name AS client_name, c.slug AS client_slug
        FROM work_items w
@@ -263,55 +381,63 @@ async function handleWorkItemById(req, res, method, id) {
        WHERE w.id = $1`,
       [id]
     );
-    if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Work item not found' });
-    }
-    return sendJSON(res, 200, rows[0]);
-  }
-  
-  if (method === 'PUT') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
-    }
     
-    const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = body;
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Work item not found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching work item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update work item
+app.put('/api/work-items/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = req.body;
     
     const { rows } = await pool.query(
       `UPDATE work_items 
        SET client_id=$1, title=$2, description=$3, status=$4, priority=$5, due_date=$6, amount=$7, payment_status=$8, assigned_to=$9, updated_at=CURRENT_TIMESTAMP
        WHERE id=$10 RETURNING *`,
-      [client_id, title, description || null, status || 'pending', priority || 'medium', due_date || null, amount || null, payment_status || 'unpaid', assigned_to || null, id]
+      [client_id, title.trim(), description || null, status || 'pending', priority || 'medium', due_date || null, amount || null, payment_status || 'unpaid', assigned_to || null, id]
     );
+    
     if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Work item not found' });
+      return res.status(404).json({ error: 'Work item not found' });
     }
-    return sendJSON(res, 200, rows[0]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating work item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'DELETE') {
-    const { rows } = await pool.query('DELETE FROM work_items WHERE id=$1 RETURNING id', [id]);
-    if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Work item not found' });
-    }
-    return sendJSON(res, 200, { deleted: true });
-  }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Calendar Events
-async function handleCalendarEvents(req, res, method) {
-  await migrate();
-  
-  if (method === 'GET') {
-    const urlObj = new URL(req.url, `http://localhost:${PORT}`);
-    const userId = urlObj.searchParams.get('user_id');
-    const workItemId = urlObj.searchParams.get('work_item_id');
-    const startDate = urlObj.searchParams.get('start_date');
-    const endDate = urlObj.searchParams.get('end_date');
+// Delete work item (requires admin)
+app.delete('/api/work-items/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { rows } = await pool.query('DELETE FROM work_items WHERE id=$1 RETURNING id', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Work item not found' });
+    }
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Error deleting work item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get calendar events
+app.get('/api/calendar-events', async (req, res) => {
+  try {
+    await migrate();
+    const { user_id, work_item_id, start_date, end_date } = req.query;
     
     let query = `
       SELECT e.*, w.title AS work_item_title, w.client_id
@@ -322,101 +448,105 @@ async function handleCalendarEvents(req, res, method) {
     const params = [];
     let paramIndex = 1;
     
-    if (userId) {
+    if (user_id) {
       query += ` AND e.user_id = $${paramIndex}`;
-      params.push(userId);
+      params.push(user_id);
       paramIndex++;
     }
-    if (workItemId) {
+    if (work_item_id) {
       query += ` AND e.work_item_id = $${paramIndex}`;
-      params.push(workItemId);
+      params.push(work_item_id);
       paramIndex++;
     }
-    if (startDate) {
+    if (start_date) {
       query += ` AND e.event_date >= $${paramIndex}`;
-      params.push(startDate);
+      params.push(start_date);
       paramIndex++;
     }
-    if (endDate) {
+    if (end_date) {
       query += ` AND e.event_date <= $${paramIndex}`;
-      params.push(endDate);
+      params.push(end_date);
       paramIndex++;
     }
     
     query += ' ORDER BY e.event_date ASC';
     
     const { rows } = await pool.query(query, params);
-    return sendJSON(res, 200, rows);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching calendar events:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'POST') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
-    }
+});
+
+// Create calendar event
+app.post('/api/calendar-events', async (req, res) => {
+  try {
+    await migrate();
+    const { work_item_id, user_id, title, description, event_date, event_type, external_calendar_id } = req.body;
     
-    const { work_item_id, user_id, title, description, event_date, event_type, external_calendar_id } = body;
     if (!user_id || !title || !event_date) {
-      return sendJSON(res, 400, { error: 'user_id, title, and event_date are required' });
+      return res.status(400).json({ error: 'user_id, title, and event_date are required' });
     }
     
     const { rows } = await pool.query(
       `INSERT INTO calendar_events (work_item_id, user_id, title, description, event_date, event_type, external_calendar_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [work_item_id || null, user_id, title, description || null, event_date, event_type || 'task', external_calendar_id || null]
+      [work_item_id || null, user_id, title.trim(), description || null, event_date, event_type || 'task', external_calendar_id || null]
     );
-    return sendJSON(res, 201, rows[0]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating calendar event:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Single Calendar Event by ID
-async function handleCalendarEventById(req, res, method, id) {
-  await migrate();
-  
-  if (method === 'PUT') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
-    }
-    
-    const { work_item_id, user_id, title, description, event_date, event_type } = body;
+// Update calendar event
+app.put('/api/calendar-events/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { work_item_id, user_id, title, description, event_date, event_type } = req.body;
     
     const { rows } = await pool.query(
       `UPDATE calendar_events 
        SET work_item_id=$1, user_id=$2, title=$3, description=$4, event_date=$5, event_type=$6
        WHERE id=$7 RETURNING *`,
-      [work_item_id || null, user_id, title, description || null, event_date, event_type || 'task', id]
+      [work_item_id || null, user_id, title.trim(), description || null, event_date, event_type || 'task', id]
     );
+    
     if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Event not found' });
+      return res.status(404).json({ error: 'Event not found' });
     }
-    return sendJSON(res, 200, rows[0]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating calendar event:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'DELETE') {
-    const { rows } = await pool.query('DELETE FROM calendar_events WHERE id=$1 RETURNING id', [id]);
-    if (rows.length === 0) {
-      return sendJSON(res, 404, { error: 'Event not found' });
-    }
-    return sendJSON(res, 200, { deleted: true });
-  }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Work Comments
-async function handleWorkComments(req, res, method) {
-  await migrate();
-  
-  if (method === 'GET') {
-    const urlObj = new URL(req.url, `http://localhost:${PORT}`);
-    const workItemId = urlObj.searchParams.get('work_item_id');
+// Delete calendar event
+app.delete('/api/calendar-events/:id', async (req, res) => {
+  try {
+    await migrate();
+    const { id } = req.params;
+    const { rows } = await pool.query('DELETE FROM calendar_events WHERE id=$1 RETURNING id', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Error deleting calendar event:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get work comments
+app.get('/api/work-comments', async (req, res) => {
+  try {
+    await migrate();
+    const { work_item_id } = req.query;
     
     let query = `
       SELECT c.*, u.full_name AS user_name
@@ -426,320 +556,234 @@ async function handleWorkComments(req, res, method) {
     `;
     const params = [];
     
-    if (workItemId) {
+    if (work_item_id) {
       query += ' AND c.work_item_id = $1';
-      params.push(workItemId);
+      params.push(work_item_id);
     }
     
     query += ' ORDER BY c.created_at ASC';
     
     const { rows } = await pool.query(query, params);
-    return sendJSON(res, 200, rows);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  if (method === 'POST') {
-    let body;
-    try {
-      body = await parseBody(req);
-    } catch (e) {
-      return sendJSON(res, 400, { error: 'Invalid JSON' });
-    }
+});
+
+// Create work comment
+app.post('/api/work-comments', async (req, res) => {
+  try {
+    await migrate();
+    const { work_item_id, comment } = req.body;
     
-    const { work_item_id, user_id, comment } = body;
-    if (!work_item_id || !user_id || !comment) {
-      return sendJSON(res, 400, { error: 'work_item_id, user_id, and comment are required' });
+    if (!work_item_id || !comment) {
+      return res.status(400).json({ error: 'work_item_id and comment are required' });
     }
     
     const { rows } = await pool.query(
       `INSERT INTO work_comments (work_item_id, user_id, comment) VALUES ($1, $2, $3) RETURNING *`,
-      [work_item_id, user_id, comment]
+      [work_item_id, req.user.id, comment.trim()]
     );
-    return sendJSON(res, 201, rows[0]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating comment:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  
-  return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-}
+});
 
-// API: Dashboard Stats
-async function handleDashboard(req, res, method) {
-  await migrate();
-  
-  if (method !== 'GET') {
-    return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-  }
-  
-  const urlObj = new URL(req.url, `http://localhost:${PORT}`);
-  const clientId = urlObj.searchParams.get('client_id');
-  const startDate = urlObj.searchParams.get('start_date');
-  const endDate = urlObj.searchParams.get('end_date');
-  
-  // Build base query conditions
-  let whereClause = 'WHERE 1=1';
-  const params = [];
-  let paramIndex = 1;
-  
-  if (clientId) {
-    whereClause += ` AND w.client_id = $${paramIndex}`;
-    params.push(clientId);
-    paramIndex++;
-  }
-  if (startDate) {
-    whereClause += ` AND w.due_date >= $${paramIndex}`;
-    params.push(startDate);
-    paramIndex++;
-  }
-  if (endDate) {
-    whereClause += ` AND w.due_date <= $${paramIndex}`;
-    params.push(endDate);
-    paramIndex++;
-  }
-  
-  // Get task counts by status
-  const statusQuery = `
-    SELECT status, COUNT(*) as count
-    FROM work_items ${whereClause}
-    GROUP BY status
-  `;
-  const { rows: statusRows } = await pool.query(statusQuery, params);
-  
-  // Get payment totals
-  const paymentQuery = `
-    SELECT 
-      COALESCE(SUM(amount), 0) as total,
-      COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) as paid,
-      COALESCE(SUM(CASE WHEN payment_status != 'paid' THEN amount ELSE 0 END), 0) as outstanding
-    FROM work_items ${whereClause}
-  `;
-  const { rows: paymentRows } = await pool.query(paymentQuery, params);
-  
-  // Get overdue tasks
-  const overdueQuery = `
-    SELECT w.*, c.name AS client_name, c.slug AS client_slug
-    FROM work_items w
-    LEFT JOIN clients c ON c.id = w.client_id
-    ${whereClause.replace('WHERE 1=1', 'WHERE 1=1 AND w.status != \'completed\' AND w.due_date < CURRENT_DATE')}
-    ORDER BY w.due_date ASC
-  `;
-  const { rows: overdueRows } = await pool.query(overdueQuery, params);
-  
-  // Get recent tasks
-  const recentQuery = `
-    SELECT w.*, c.name AS client_name, c.slug AS client_slug
-    FROM work_items w
-    LEFT JOIN clients c ON c.id = w.client_id
-    ${whereClause}
-    ORDER BY w.created_at DESC
-    LIMIT 20
-  `;
-  const { rows: recentRows } = await pool.query(recentQuery, params);
-  
-  const stats = {
-    byStatus: {},
-    payments: paymentRows[0],
-    overdue: overdueRows,
-    recent: recentRows
-  };
-  
-  statusRows.forEach(row => {
-    stats.byStatus[row.status] = parseInt(row.count);
-  });
-  
-  return sendJSON(res, 200, stats);
-}
-
-// API: Share Link (Public client view)
-async function handleShare(req, res, method, slug) {
-  await migrate();
-  
-  if (method !== 'GET') {
-    return sendJSON(res, 405, { error: `Method ${method} not allowed` });
-  }
-  
-  const urlObj = new URL(req.url, `http://localhost:${PORT}`);
-  const startDate = urlObj.searchParams.get('start_date');
-  const endDate = urlObj.searchParams.get('end_date');
-  const status = urlObj.searchParams.get('status');
-  
-  // Get client by slug
-  const { rows: clientRows } = await pool.query('SELECT * FROM clients WHERE slug = $1', [slug]);
-  if (clientRows.length === 0) {
-    return sendJSON(res, 404, { error: 'Client not found' });
-  }
-  const client = clientRows[0];
-  
-  // Build query for work items
-  let query = `
-    SELECT * FROM work_items
-    WHERE client_id = $1
-  `;
-  const params = [client.id];
-  let paramIndex = 2;
-  
-  if (startDate) {
-    query += ` AND due_date >= $${paramIndex}`;
-    params.push(startDate);
-    paramIndex++;
-  }
-  if (endDate) {
-    query += ` AND due_date <= $${paramIndex}`;
-    params.push(endDate);
-    paramIndex++;
-  }
-  if (status) {
-    query += ` AND status = $${paramIndex}`;
-    params.push(status);
-    paramIndex++;
-  }
-  
-  query += ' ORDER BY due_date ASC NULLS LAST, created_at DESC';
-  
-  const { rows: workItems } = await pool.query(query, params);
-  
-  // Calculate payment summary
-  const summary = {
-    total: 0,
-    paid: 0,
-    partial: 0,
-    unpaid: 0
-  };
-  
-  workItems.forEach(item => {
-    const amount = Number(item.amount) || 0;
-    summary.total += amount;
-    if (item.payment_status === 'paid') {
-      summary.paid += amount;
-    } else if (item.payment_status === 'partial') {
-      summary.partial += amount;
-    } else {
-      summary.unpaid += amount;
-    }
-  });
-  
-  return sendJSON(res, 200, {
-    client,
-    workItems,
-    summary
-  });
-}
-
-// Main request handler
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
-  const pathname = parsedUrl.pathname;
-  const method = req.method;
-  
-  // Enable CORS for local development
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-  
-  // API Routes
+// Dashboard stats
+app.get('/api/dashboard', async (req, res) => {
   try {
-    // /api/dashboard
-    if (pathname === '/api/dashboard') {
-      return handleDashboard(req, res, method);
+    await migrate();
+    const { client_id, start_date, end_date } = req.query;
+    
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (client_id) {
+      whereClause += ` AND w.client_id = $${paramIndex}`;
+      params.push(client_id);
+      paramIndex++;
+    }
+    if (start_date) {
+      whereClause += ` AND w.due_date >= $${paramIndex}`;
+      params.push(start_date);
+      paramIndex++;
+    }
+    if (end_date) {
+      whereClause += ` AND w.due_date <= $${paramIndex}`;
+      params.push(end_date);
+      paramIndex++;
     }
     
-    // /api/clients
-    if (pathname === '/api/clients') {
-      return handleClients(req, res, method);
+    // Get task counts by status
+    const statusQuery = `
+      SELECT status, COUNT(*) as count
+      FROM work_items ${whereClause}
+      GROUP BY status
+    `;
+    const { rows: statusRows } = await pool.query(statusQuery, params);
+    
+    // Get payment totals
+    const paymentQuery = `
+      SELECT 
+        COALESCE(SUM(amount), 0) as total,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) as paid,
+        COALESCE(SUM(CASE WHEN payment_status != 'paid' THEN amount ELSE 0 END), 0) as outstanding
+      FROM work_items ${whereClause}
+    `;
+    const { rows: paymentRows } = await pool.query(paymentQuery, params);
+    
+    // Get overdue tasks
+    const overdueQuery = `
+      SELECT w.*, c.name AS client_name, c.slug AS client_slug
+      FROM work_items w
+      LEFT JOIN clients c ON c.id = w.client_id
+      ${whereClause.replace('WHERE 1=1', 'WHERE 1=1 AND w.status != \'completed\' AND w.due_date < CURRENT_DATE')}
+      ORDER BY w.due_date ASC
+    `;
+    const { rows: overdueRows } = await pool.query(overdueQuery, params);
+    
+    // Get recent tasks
+    const recentQuery = `
+      SELECT w.*, c.name AS client_name, c.slug AS client_slug
+      FROM work_items w
+      LEFT JOIN clients c ON c.id = w.client_id
+      ${whereClause}
+      ORDER BY w.created_at DESC
+      LIMIT 20
+    `;
+    const { rows: recentRows } = await pool.query(recentQuery, params);
+    
+    const stats = {
+      byStatus: {},
+      payments: paymentRows[0],
+      overdue: overdueRows,
+      recent: recentRows
+    };
+    
+    statusRows.forEach(row => {
+      stats.byStatus[row.status] = parseInt(row.count);
+    });
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching dashboard:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Share link (public client view - no auth required)
+app.get('/api/share/:slug', optionalAuth, async (req, res) => {
+  try {
+    await migrate();
+    const { slug } = req.params;
+    const { start_date, end_date, status } = req.query;
+    
+    // Get client by slug
+    const { rows: clientRows } = await pool.query('SELECT * FROM clients WHERE slug = $1', [slug]);
+    if (clientRows.length === 0) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    const client = clientRows[0];
+    
+    // Build query for work items
+    let query = `
+      SELECT * FROM work_items
+      WHERE client_id = $1
+    `;
+    const params = [client.id];
+    let paramIndex = 2;
+    
+    if (start_date) {
+      query += ` AND due_date >= $${paramIndex}`;
+      params.push(start_date);
+      paramIndex++;
+    }
+    if (end_date) {
+      query += ` AND due_date <= $${paramIndex}`;
+      params.push(end_date);
+      paramIndex++;
+    }
+    if (status) {
+      query += ` AND status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
     }
     
-    // /api/clients/:id
-    const clientMatch = pathname.match(/^\/api\/clients\/(\d+)$/);
-    if (clientMatch) {
-      return handleClientById(req, res, method, clientMatch[1]);
-    }
+    query += ' ORDER BY due_date ASC NULLS LAST, created_at DESC';
     
-    // /api/work-items
-    if (pathname === '/api/work-items') {
-      return handleWorkItems(req, res, method);
-    }
+    const { rows: workItems } = await pool.query(query, params);
     
-    // /api/work-items/:id
-    const workItemMatch = pathname.match(/^\/api\/work-items\/(\d+)$/);
-    if (workItemMatch) {
-      return handleWorkItemById(req, res, method, workItemMatch[1]);
-    }
+    // Calculate payment summary
+    const summary = {
+      total: 0,
+      paid: 0,
+      partial: 0,
+      unpaid: 0
+    };
     
-    // /api/calendar-events
-    if (pathname === '/api/calendar-events') {
-      return handleCalendarEvents(req, res, method);
-    }
-    
-    // /api/calendar-events/:id
-    const eventMatch = pathname.match(/^\/api\/calendar-events\/(\d+)$/);
-    if (eventMatch) {
-      return handleCalendarEventById(req, res, method, eventMatch[1]);
-    }
-    
-    // /api/work-comments
-    if (pathname === '/api/work-comments') {
-      return handleWorkComments(req, res, method);
-    }
-    
-    // /api/share/:slug
-    const shareMatch = pathname.match(/^\/api\/share\/([^/]+)$/);
-    if (shareMatch) {
-      return handleShare(req, res, method, shareMatch[1]);
-    }
-    
-    // /share/:slug - serve static share.html
-    const sharePageMatch = pathname.match(/^\/share\/([^/]+)$/);
-    if (sharePageMatch) {
-      const filePath = path.join(PUBLIC_DIR, 'share.html');
-      return serveStatic(res, filePath);
-    }
-    
-    // Static Files
-    let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
-    
-    // Security: prevent directory traversal
-    if (!filePath.startsWith(PUBLIC_DIR)) {
-      res.writeHead(403);
-      res.end('Forbidden');
-      return;
-    }
-    
-    // Check if file exists, if not try index.html in that directory
-    fs.stat(filePath, (err, stats) => {
-      if (err || !stats.isFile()) {
-        // Try adding .html extension
-        const htmlPath = filePath.endsWith('.html') ? filePath : filePath + '.html';
-        fs.stat(htmlPath, (err2, stats2) => {
-          if (err2 || !stats2.isFile()) {
-            // Try index.html in directory
-            const indexPath = path.join(filePath, 'index.html');
-            fs.stat(indexPath, (err3, stats3) => {
-              if (err3 || !stats3.isFile()) {
-                res.writeHead(404);
-                res.end('Not Found');
-              } else {
-                serveStatic(res, indexPath);
-              }
-            });
-          } else {
-            serveStatic(res, htmlPath);
-          }
-        });
+    workItems.forEach(item => {
+      const amount = Number(item.amount) || 0;
+      summary.total += amount;
+      if (item.payment_status === 'paid') {
+        summary.paid += amount;
+      } else if (item.payment_status === 'partial') {
+        summary.partial += amount;
       } else {
-        serveStatic(res, filePath);
+        summary.unpaid += amount;
       }
     });
     
+    res.json({
+      client,
+      workItems,
+      summary
+    });
   } catch (error) {
-    console.error('Server error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
+    console.error('Error fetching share data:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`ClientPM server running at http://localhost:${PORT}`);
-  console.log('Press Ctrl+C to stop');
+// ============ STATIC FILE SERVING ============
+
+// Serve static files
+app.use(express.static(PUBLIC_DIR));
+
+// Serve share.html for /share/:slug routes
+app.get('/share/:slug', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'share.html'));
 });
+
+// For SPA routing - all other routes serve index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
+// ============ ERROR HANDLING ============
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// ============ START SERVER ============
+
+// Ensure database migrations run before starting
+migrate()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ ClientPM server running at http://localhost:${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log('🔒 Authentication enabled');
+      console.log('Press Ctrl+C to stop');
+    });
+  })
+  .catch(err => {
+    console.error('❌ Failed to initialize database:', err);
+    process.exit(1);
+  });
