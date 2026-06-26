@@ -1105,6 +1105,8 @@ textarea {
   box-shadow: var(--shadow);
   border: 1px solid var(--gray-200);
   transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .client-card:hover {
@@ -1114,20 +1116,23 @@ textarea {
 
 .client-card-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  justify-content: center;
+  align-items: center;
   margin-bottom: 12px;
+  width: 100%;
 }
 
 .client-card h3 {
   font-size: 1.125rem;
   margin-bottom: 4px;
+  text-align: center;
 }
 
 .client-company {
   font-size: 13px;
   color: var(--gray-500);
   margin-bottom: 12px;
+  text-align: center;
 }
 
 .client-info {
@@ -1135,6 +1140,8 @@ textarea {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
+  width: 100%;
+  align-items: center;
 }
 
 .client-info-item {
@@ -1143,6 +1150,8 @@ textarea {
   gap: 8px;
   font-size: 13px;
   color: var(--gray-600);
+  justify-content: center;
+  width: 100%;
 }
 
 .client-card-actions {
@@ -1150,6 +1159,8 @@ textarea {
   gap: 8px;
   padding-top: 16px;
   border-top: 1px solid var(--gray-100);
+  justify-content: center;
+  width: 100%;
 }
 
 /* ===== Task Card View ===== */
