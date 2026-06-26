@@ -10,6 +10,7 @@ const path = require('path');
 const { URL } = require('url');
 const cors = require('cors');
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
+const { logger, errorLogger } = require('./middleware/logger');
 
 // Redis client setup
 const { createClient } = require('redis');
