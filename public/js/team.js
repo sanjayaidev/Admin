@@ -1,8 +1,6 @@
 // public/js/team.js
 // Team management — custom roles + role-based access
 
-let currentUser = null;
-let isAdmin = false;
 let allMembers = [];
 let allRoles = [];
 let deleteTargetId = null;
@@ -13,8 +11,8 @@ async function loadTeamMembers() {
   const authResult = await window.checkAuth();
   if (!authResult.authenticated) return;
 
-  currentUser = authResult.user;
-  isAdmin = currentUser.role === 'admin';
+  window.currentUser = authResult.user;
+  const isAdmin = window.currentUser.role === 'admin';
 
   // Show admin controls
   if (isAdmin) {
@@ -130,7 +128,7 @@ function memberCardHtml(m) {
       <button class="btn outline small ${m.is_active ? 'warn' : 'success-btn'}" onclick="toggleStatus('${m.id}', ${!m.is_active})">
         ${m.is_active ? 'Deactivate' : 'Activate'}
       </button>
-      ${m.id !== currentUser.id ? `<button class="btn danger small" onclick="openDeleteModal('${m.id}', '${escapeHtml(m.full_name)}')">Remove</button>` : ''}
+      ${m.id !== window.currentUser.id ? `<button class="btn danger small" onclick="openDeleteModal('${m.id}', '${escapeHtml(m.full_name)}')">Remove</button>` : ''}
     </div>
   ` : '';
 
