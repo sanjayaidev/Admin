@@ -1,8 +1,6 @@
 
 // public/js/auth.js
 // Frontend authentication logic
-
-let currentUser = null;
 let authToken = null;
 
 // Check if user is authenticated

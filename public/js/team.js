@@ -4,7 +4,7 @@
 let allMembers = [];
 let allRoles = [];
 let deleteTargetId = null;
-
+let isAdmin = false;
 // ─── Called by auth.js after auth check ───────────────────────────────────────
 
 async function loadTeamMembers() {
@@ -12,7 +12,7 @@ async function loadTeamMembers() {
   if (!authResult.authenticated) return;
 
   window.currentUser = authResult.user;
-  const isAdmin = window.currentUser.role === 'admin';
+  isAdmin = window.currentUser.role === 'admin';
 
   // Show admin controls
   if (isAdmin) {
