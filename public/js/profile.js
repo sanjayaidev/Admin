@@ -56,7 +56,7 @@ async function loadProfileData() {
   console.log('[Profile] Loading profile data');
   
   try {
-    const response = await fetch('/api/users/me', {
+    const response = await fetch('/api/profile/me', {
       credentials: 'include'
     });
     
@@ -65,12 +65,12 @@ async function loadProfileData() {
       console.log('[Profile] Profile data loaded:', data);
       
       currentUser = data;
-      userSettings = data.settings || {};
+      userSettings = data.notification_preferences || {};
       
       // Update profile header
       document.getElementById('profileName').textContent = data.full_name || 'Unknown';
       document.getElementById('profileEmail').textContent = data.email;
-      document.getElementById('profileRole').textContent = data.role || 'user';
+      document.getElementById('profileRole').textContent = data.custom_role || data.role || 'user';
       
       // Update role badge color
       const roleBadge = document.getElementById('profileRole');
@@ -80,7 +80,7 @@ async function loadProfileData() {
       document.getElementById('fullName').value = data.full_name || '';
       document.getElementById('email').value = data.email || '';
       document.getElementById('phone').value = data.phone || '';
-      document.getElementById('role').value = data.role || '';
+      document.getElementById('role').value = data.custom_role || data.role || '';
       document.getElementById('bio').value = data.bio || '';
       
       // Load avatar if exists
@@ -91,10 +91,8 @@ async function loadProfileData() {
       
       // Populate notification preferences
       const prefs = data.notification_preferences || {};
-      document.getElementById('prefEmailNotifications').checked = prefs.email_notifications !== false;
-      document.getElementById('prefWhatsappNotifications').checked = prefs.whatsapp_notifications === true;
-      document.getElementById('prefTaskAssignments').checked = prefs.task_assignments !== false;
-      document.getElementById('prefMentions').checked = prefs.mentions !== false;
+      document.getElementById('prefEmailNotifications').checked = prefs.email !== false;
+      document.getElementById('prefWhatsappNotifications').checked = prefs.whatsapp === true;
       
       // Load Google connections
       await loadGoogleConnections();
@@ -280,7 +278,7 @@ function formatTimeAgo(dateString) {
   return 'Just now';
 }
 
-// Handle avatar upload
+// Handle avatar upload - converts image to base64 and saves
 async function handleAvatarUpload(e) {
   const file = e.target.files[0];
   
@@ -299,37 +297,42 @@ async function handleAvatarUpload(e) {
     return;
   }
   
-  const formData = new FormData();
-  formData.append('avatar', file);
-  
-  try {
-    const response = await fetch('/api/users/me/avatar', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData
-    });
+  // Convert file to base64
+  const reader = new FileReader();
+  reader.onload = async function(event) {
+    const base64String = event.target.result;
     
-    if (response.ok) {
-      const data = await response.json();
-      console.log('[Profile] Avatar uploaded successfully');
+    try {
+      const response = await fetch('/api/profile/avatar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ avatar: base64String })
+      });
       
-      // Update preview
-      document.getElementById('avatarPreview').innerHTML = `<img src="${data.avatar_url}" alt="Avatar">`;
-      document.getElementById('removeAvatarBtn').style.display = 'inline-block';
-      
-      alert('Avatar updated successfully');
-    } else {
-      const error = await response.json();
-      alert(error.error || 'Failed to upload avatar');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Profile] Avatar uploaded successfully');
+        
+        // Update preview
+        document.getElementById('avatarPreview').innerHTML = `<img src="${data.avatar}" alt="Avatar">`;
+        document.getElementById('removeAvatarBtn').style.display = 'inline-block';
+        
+        alert('Avatar updated successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to upload avatar');
+        console.error('[Profile] Avatar upload error:', error);
+      }
+    } catch (error) {
       console.error('[Profile] Avatar upload error:', error);
+      alert('Network error. Please try again.');
     }
-  } catch (error) {
-    console.error('[Profile] Avatar upload error:', error);
-    alert('Network error. Please try again.');
-  }
-  
-  // Reset file input
-  e.target.value = '';
+    
+    // Reset file input
+    e.target.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 // Remove avatar
@@ -341,9 +344,11 @@ async function removeAvatar() {
   }
   
   try {
-    const response = await fetch('/api/users/me/avatar', {
-      method: 'DELETE',
-      credentials: 'include'
+    const response = await fetch('/api/profile/avatar', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ avatar: null })
     });
     
     if (response.ok) {
@@ -372,7 +377,7 @@ async function saveProfile(e) {
   const bio = document.getElementById('bio').value.trim();
   
   try {
-    const response = await fetch('/api/users/me', {
+    const response = await fetch('/api/profile/me', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -450,17 +455,15 @@ async function saveNotificationPrefs(e) {
   
   const preferences = {
     email_notifications: document.getElementById('prefEmailNotifications').checked,
-    whatsapp_notifications: document.getElementById('prefWhatsappNotifications').checked,
-    task_assignments: document.getElementById('prefTaskAssignments').checked,
-    mentions: document.getElementById('prefMentions').checked
+    whatsapp_notifications: document.getElementById('prefWhatsappNotifications').checked
   };
   
   try {
-    const response = await fetch('/api/users/me', {
+    const response = await fetch('/api/profile/notifications', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ notification_preferences: preferences })
+      body: JSON.stringify(preferences)
     });
     
     if (response.ok) {

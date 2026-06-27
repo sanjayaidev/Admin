@@ -27,11 +27,23 @@ const { createClient } = require('redis');
 const redisClient = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379'
 });
-redisClient.on('error', (err) => console.error('Redis Client Error:', err));
+redisClient.on('error', (err) => {
+  // Silently ignore Redis errors in development if Redis is not available
+  if (process.env.NODE_ENV !== 'production') {
+    // console.error('Redis Client Error:', err.message);
+  } else {
+    console.error('Redis Client Error:', err.message);
+  }
+});
 redisClient.on('connect', () => console.log('✅ Redis connected'));
-redisClient.connect().catch(err =>
-  console.error('❌ Redis connect failed:', err.message)
-);
+// Attempt to connect but don't fail if Redis is unavailable
+redisClient.connect().catch(err => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('⚠️  Redis not available, continuing without caching');
+  } else {
+    console.error('❌ Redis connect failed:', err.message);
+  }
+});
 
 // ── App setup ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -199,6 +211,91 @@ app.post('/api/auth/change-password', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// ── Profile ────────────────────────────────────────────────────────────────────
+
+// GET current user profile
+app.get('/api/profile/me', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, full_name, phone, avatar, bio, role, custom_role, 
+              notification_preferences, google_calendar_sync, google_drive_sync,
+              created_at
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching profile:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT update current user profile
+app.put('/api/profile/me', async (req, res) => {
+  try {
+    const { full_name, email, phone, bio } = req.body;
+    if (!full_name?.trim() || !email?.trim())
+      return res.status(400).json({ error: 'Name and email are required' });
+
+    // Check if email is already taken by another user
+    const existing = await pool.query('SELECT id FROM users WHERE email=$1 AND id!=$2', [email, req.user.id]);
+    if (existing.rows.length > 0)
+      return res.status(400).json({ error: 'Email already in use' });
+
+    const { rows } = await pool.query(
+      `UPDATE users SET full_name=$1, email=$2, phone=$3, bio=$4, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$5 RETURNING id, email, full_name, phone, avatar, bio, role, custom_role, created_at`,
+      [full_name.trim(), email.trim(), phone||null, bio||null, req.user.id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT update avatar (base64 image)
+app.put('/api/profile/avatar', async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    if (avatar === undefined)
+      return res.status(400).json({ error: 'Avatar data is required' });
+
+    const { rows } = await pool.query(
+      `UPDATE users SET avatar=$1, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$2 RETURNING id, avatar`,
+      [avatar, req.user.id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating avatar:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT update notification preferences
+app.put('/api/profile/notifications', async (req, res) => {
+  try {
+    const { email_notifications, whatsapp_notifications } = req.body;
+    const prefs = {
+      email: email_notifications || false,
+      whatsapp: whatsapp_notifications || false
+    };
+
+    const { rows } = await pool.query(
+      `UPDATE users SET notification_preferences=$1, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$2 RETURNING notification_preferences`,
+      [JSON.stringify(prefs), req.user.id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating notifications:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 // ── Clients ────────────────────────────────────────────────────────────────────
 
