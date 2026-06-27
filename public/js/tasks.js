@@ -5,8 +5,6 @@ let allTasks = [];
 let allClients = [];
 let allMembers = [];
 let deleteId = null;
-let currentUser = null;
-let isAdmin = false;
 
 // ─── Entry point called by auth.js ────────────────────────────────────────────
 
@@ -15,8 +13,8 @@ async function loadTasks() {
   const authResult = await window.checkAuth();
   if (!authResult.authenticated) return;
 
-  currentUser = authResult.user;
-  isAdmin = currentUser.role === 'admin';
+  window.currentUser = authResult.user;
+  const isAdmin = window.currentUser.role === 'admin';
 
   // Show Add Task button only for admins
   if (isAdmin) {

@@ -3,8 +3,7 @@
  * Handles user profile management, avatar upload, password change, and activity history
  */
 
-// State management
-let currentUser = null;
+// State management - currentUser is defined globally in auth.js
 let userSettings = {};
 
 // Initialize page
@@ -20,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
-  currentUser = authResult.user;
+  window.currentUser = authResult.user;
   
   // Load profile data
   await loadProfileData();
@@ -64,7 +63,7 @@ async function loadProfileData() {
       const data = await response.json();
       console.log('[Profile] Profile data loaded:', data);
       
-      currentUser = data;
+      window.currentUser = data;
       userSettings = data.notification_preferences || {};
       
       // Update profile header

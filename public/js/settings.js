@@ -3,8 +3,7 @@
  * Handles Google integrations, notification preferences, and system settings
  */
 
-// State management
-let currentUser = null;
+// State management - currentUser is defined globally in auth.js
 let integrations = {};
 
 // Initialize page - now handled by auth.js
@@ -20,10 +19,10 @@ async function initSettingsPage() {
     return;
   }
 
-  currentUser = authResult.user;
+  window.currentUser = authResult.user;
 
   // Update navbar with user info (using auth.js function)
-  window.updateNavbar(currentUser);
+  window.updateNavbar(window.currentUser);
 
   // Load user settings
   await loadUserSettings();
