@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team Management - ClientPM</title>
+  <title>Team · ClientPM</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/team.css">
   <link rel="stylesheet" href="/css/auh-modal.css">
 </head>
 <body>
-  <!-- Navigation -->
+
   <nav class="navbar">
     <span class="brand">ClientPM</span>
     <a href="/">Dashboard</a>
@@ -22,127 +22,168 @@
   </nav>
 
   <div class="page">
+
+    <!-- Page Header -->
     <div class="page-header">
       <div>
-        <h1>👥 Team Management</h1>
+        <h1>👥 Team</h1>
         <p id="team-count">Loading...</p>
       </div>
-      <button id="addMemberBtn" class="btn" style="display: none;">+ Add Member</button>
-    </div>
-
-    <!-- Admin-only notice -->
-    <div id="adminNotice" class="alert alert-warning" style="display: none; margin-bottom: 20px;">
-      ⚠️ Only administrators can manage team members.
-    </div>
-
-      <!-- Team Stats -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="totalMembers">0</div>
-          <div class="stat-label">Total Members</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="totalAdmins">0</div>
-          <div class="stat-label">Administrators</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="totalTeam">0</div>
-          <div class="stat-label">Team Members</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="totalClients">0</div>
-          <div class="stat-label">Client Accounts</div>
-        </div>
+      <div id="admin-actions" style="display:none; gap:10px; display:none;">
+        <button class="btn outline" onclick="openRolesModal()">⚙️ Manage Roles</button>
+        <button class="btn" onclick="openMemberModal()">+ Add Member</button>
       </div>
+    </div>
 
-      <!-- Team Members List -->
-      <section class="team-section">
-        <h2>All Team Members</h2>
-        
-        <!-- Filters -->
-        <div class="filters-bar">
-          <div class="filter-group">
-            <label for="roleFilter">Filter by Role:</label>
-            <select id="roleFilter">
-              <option value="all">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="team">Team</option>
-              <option value="client">Client</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label for="statusFilter">Status:</label>
-            <select id="statusFilter">
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div class="search-group">
-            <input type="text" id="searchInput" placeholder="Search by name or email...">
-          </div>
-        </div>
+    <!-- Non-admin notice -->
+    <div id="member-notice" class="member-notice" style="display:none;">
+      You are viewing team information. Only admins can manage members and roles.
+    </div>
 
-        <!-- Team Grid -->
-        <div class="team-grid" id="teamGrid">
-          <div class="loading-state">Loading team members...</div>
-        </div>
-      </section>
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Total Members</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-admins">0</div>
+        <div class="stat-label">Admins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-active">0</div>
+        <div class="stat-label">Active</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-roles">0</div>
+        <div class="stat-label">Custom Roles</div>
+      </div>
+    </div>
 
-      <!-- Workload Distribution -->
-      <section class="team-section">
-        <h2>📊 Workload Distribution</h2>
-        <div class="workload-grid" id="workloadGrid">
-          <div class="loading-state">Loading workload data...</div>
-        </div>
-      </section>
+    <!-- Filters -->
+    <div class="filters-bar" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:20px;">
+      <input type="text" id="search-input" placeholder="Search by name or email..." style="max-width:240px;" oninput="renderMembers()">
+      <select id="filter-role" onchange="renderMembers()">
+        <option value="">All Roles</option>
+      </select>
+      <select id="filter-status" onchange="renderMembers()">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+
+    <!-- Team Grid -->
+    <div class="team-grid" id="team-grid">
+      <div class="loading">Loading team members...</div>
+    </div>
+
+    <!-- Workload Section -->
+    <div style="margin-top:36px;">
+      <h2 style="margin-bottom:16px;">📊 Workload Distribution</h2>
+      <div id="workload-grid" class="workload-grid">
+        <div class="loading">Loading workload...</div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Add/Edit Member Modal -->
-  <div id="memberModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="modalTitle">Add Team Member</h2>
-        <button class="modal-close" onclick="closeMemberModal()">&times;</button>
-      </div>
-      <form id="memberForm">
-        <input type="hidden" id="memberId">
-        
-        <div class="form-group">
-          <label for="memberName">Full Name *</label>
-          <input type="text" id="memberName" required>
-        </div>
-        
-        <div class="form-group">
-          <label for="memberEmail">Email *</label>
-          <input type="email" id="memberEmail" required>
-        </div>
-        
-        <div class="form-group">
-          <label for="memberPhone">Phone</label>
-          <input type="tel" id="memberPhone">
-        </div>
-        
-        <div class="form-group">
-          <label for="memberRole">Role *</label>
-          <select id="memberRole" required>
+  <!-- ===================== ADD/EDIT MEMBER MODAL ===================== -->
+  <div class="modal-overlay" id="member-modal">
+    <div class="modal-box" style="max-width:540px;">
+      <h3 id="member-modal-title">Add Team Member</h3>
+      <input type="hidden" id="m-id">
+
+      <label>Full Name *</label>
+      <input type="text" id="m-name" placeholder="John Doe" required>
+
+      <label>Email *</label>
+      <input type="email" id="m-email" placeholder="john@example.com" required>
+
+      <label>Phone</label>
+      <input type="tel" id="m-phone" placeholder="+91 00000 00000">
+
+      <div class="field-row">
+        <div>
+          <label>System Role *</label>
+          <select id="m-role">
             <option value="team">Team Member</option>
-            <option value="admin">Administrator</option>
-            <option value="client">Client</option>
+            <option value="admin">Admin</option>
+          </select>
+          <small style="color:var(--gray-500); font-size:12px; margin-top:4px; display:block;">
+            Admin = full access. Team = scoped to assigned tasks only.
+          </small>
+        </div>
+        <div>
+          <label>Job Role</label>
+          <select id="m-custom-role">
+            <option value="">— Select Job Role —</option>
           </select>
         </div>
-        
-        <div class="form-group">
-          <label for="memberPassword">Password (for new users)</label>
-          <input type="password" id="memberPassword" minlength="6">
-          <small class="form-hint">Leave blank to keep existing password when editing</small>
+      </div>
+
+      <label>Password <span style="color:var(--gray-400); font-weight:400;">(leave blank to auto-generate)</span></label>
+      <input type="password" id="m-password" placeholder="Min 6 characters" minlength="6">
+
+      <div class="modal-actions">
+        <button class="btn outline" onclick="closeMemberModal()">Cancel</button>
+        <button class="btn" onclick="saveMember()">Save Member</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MANAGE ROLES MODAL ===================== -->
+  <div class="modal-overlay" id="roles-modal">
+    <div class="modal-box" style="max-width:520px;">
+      <h3>⚙️ Manage Job Roles</h3>
+      <p style="font-size:13px; color:var(--gray-500); margin-bottom:20px;">
+        Create custom roles like "Video Editor" or "Graphic Designer" to assign to team members.
+      </p>
+
+      <!-- Create new role -->
+      <div class="role-create-box">
+        <div class="field-row" style="align-items:flex-end; gap:10px;">
+          <div style="flex:1;">
+            <label>Role Name *</label>
+            <input type="text" id="new-role-name" placeholder="e.g. Video Editor">
+          </div>
+          <div style="width:52px;">
+            <label>Color</label>
+            <input type="color" id="new-role-color" value="#4f46e5" style="width:100%; height:42px; padding:4px; border-radius:var(--radius); border:1px solid var(--gray-300); cursor:pointer;">
+          </div>
         </div>
-        
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" onclick="closeMemberModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Member</button>
+        <div style="margin-top:10px;">
+          <label>Description</label>
+          <input type="text" id="new-role-desc" placeholder="Optional description">
         </div>
-      </form>
+        <button class="btn" style="margin-top:12px; width:100%;" onclick="createRole()">+ Create Role</button>
+      </div>
+
+      <!-- Existing roles list -->
+      <div style="margin-top:20px;">
+        <h4 style="font-size:14px; font-weight:600; margin-bottom:12px; color:var(--gray-700);">Existing Roles</h4>
+        <div id="roles-list">
+          <div class="loading">Loading roles...</div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn outline" onclick="closeRolesModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DELETE CONFIRM MODAL ===================== -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal-box" style="max-width:380px;">
+      <h3>Remove Member</h3>
+      <p style="font-size:14px; color:var(--gray-600);" id="delete-confirm-text">
+        Are you sure you want to remove this member? This cannot be undone.
+      </p>
+      <div class="modal-actions">
+        <button class="btn outline" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn danger" onclick="confirmDelete()">Remove</button>
+      </div>
     </div>
   </div>
 
