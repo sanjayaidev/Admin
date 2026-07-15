@@ -24,6 +24,12 @@ const {
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 
+// ── Google Modules Integration (Flow Builder) ─────────────────────────────────\n// Mount the modules API routes for Gmail, Calendar, Sheets, Docs, Drive, Forms, GBP\n// These routes are protected by requireAuth middleware above\nconst oauthRouter = require('./src/routes/oauth');
+const connectionsRouter = require('./src/routes/connections');
+const flowsRouter = require('./src/routes/flows');
+const webhooksRouter = require('./src/routes/webhooks');
+const actionRouter = require('./src/routes/actionRouter');
+
 // ── Redis ──────────────────────────────────────────────────────────────────────
 const { createClient } = require('redis');
 const redisClient = createClient({
@@ -202,6 +208,14 @@ app.get('/api/share/:slug', optionalAuth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 app.use('/api', requireAuth);
+
+// ── Google Modules Integration Routes ─────────────────────────────────────────
+// These routes use session auth from requireAuth above
+app.use('/api/oauth', oauthRouter);
+app.use('/api/connections', connectionsRouter);
+app.use('/api/flows', flowsRouter);
+app.use('/api/webhooks', webhooksRouter);
+app.use('/api/actions', actionRouter);
 
 // Change password
 app.post('/api/auth/change-password', async (req, res) => {

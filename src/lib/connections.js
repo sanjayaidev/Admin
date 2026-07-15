@@ -6,23 +6,24 @@ const logger = require('./logger');
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh if expiring within 5 min
 
 /**
- * Loads a connection row owned by userId, and refreshes the access token
+ * Loads a connection row owned by userId and orgId, and refreshes the access token
  * proactively if it's near expiry (rather than waiting for the provider
  * to return a 401).
- *
+ * 
  * NOTE: tokens are stored in plain text (no at-rest encryption). Anyone
  * with read access to sm_connections can read live OAuth tokens directly.
  */
-async function getConnection(connectionId, userId) {
+async function getConnection(connectionId, userId, orgId) {
   const { data, error } = await supabase
     .from(TABLES.CONNECTIONS)
     .select('*')
     .eq('id', connectionId)
     .eq('user_id', userId)
+    .eq('org_id', orgId)
     .maybeSingle();
 
   if (error) throw Object.assign(new Error('Failed to load connection'), { status: 500 });
-  if (!data) throw Object.assign(new Error('Connection not found or not owned by this user'), { status: 404, code: 'connection_not_found' });
+  if (!data) throw Object.assign(new Error('Connection not found or not owned by this user/org'), { status: 404, code: 'connection_not_found' });
   if (data.status !== 'active') throw Object.assign(new Error(`Connection is ${data.status}`), { status: 409, code: 'connection_inactive' });
 
   let accessToken = data.access_token;
