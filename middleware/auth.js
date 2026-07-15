@@ -17,7 +17,11 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
   
-  req.user = user;
+  // Normalize org_id to match database column naming
+  req.user = {
+    ...user,
+    org_id: user.orgId  // Add org_id alias for compatibility
+  };
   next();
 }
 
