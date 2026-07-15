@@ -15,11 +15,6 @@ module.exports = {
   baseUrl: process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
   publicBaseUrl: process.env.PUBLIC_BASE_URL || process.env.BASE_URL,
 
-  supabase: {
-    url: required('SUPABASE_URL'),
-    serviceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
-  },
-
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

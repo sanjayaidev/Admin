@@ -1,5 +1,5 @@
 const { google } = require('googleapis');
-const { supabase, TABLES } = require('./supabase');
+const { pool, update } = require('./db');
 const env = require('../config/env');
 const logger = require('./logger');
 
@@ -14,17 +14,22 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh if expiring within 5 min
  * with read access to sm_connections can read live OAuth tokens directly.
  */
 async function getConnection(connectionId, userId, orgId) {
-  const { data, error } = await supabase
-    .from(TABLES.CONNECTIONS)
-    .select('*')
-    .eq('id', connectionId)
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .maybeSingle();
+  const query = `
+    SELECT * FROM sm_connections
+    WHERE id = $1 AND user_id = $2 AND org_id = $3
+    LIMIT 1
+  `;
+  
+  const result = await pool.query(query, [connectionId, userId, orgId]);
+  const data = result.rows[0];
 
-  if (error) throw Object.assign(new Error('Failed to load connection'), { status: 500 });
-  if (!data) throw Object.assign(new Error('Connection not found or not owned by this user/org'), { status: 404, code: 'connection_not_found' });
-  if (data.status !== 'active') throw Object.assign(new Error(`Connection is ${data.status}`), { status: 409, code: 'connection_inactive' });
+  if (!data) {
+    throw Object.assign(new Error('Connection not found or not owned by this user/org'), { status: 404, code: 'connection_not_found' });
+  }
+  
+  if (data.status !== 'active') {
+    throw Object.assign(new Error(`Connection is ${data.status}`), { status: 409, code: 'connection_inactive' });
+  }
 
   let accessToken = data.access_token;
   const refreshToken = data.refresh_token;
@@ -34,13 +39,10 @@ async function getConnection(connectionId, userId, orgId) {
     const refreshed = await refreshGoogleToken(refreshToken);
     accessToken = refreshed.access_token;
 
-    await supabase
-      .from(TABLES.CONNECTIONS)
-      .update({
-        access_token: accessToken,
-        expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-      })
-      .eq('id', connectionId);
+    await update('sm_connections', {
+      access_token: accessToken,
+      expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+    }, { id: connectionId });
 
     logger.info(`[connections] refreshed google token for connection ${connectionId}`);
   }

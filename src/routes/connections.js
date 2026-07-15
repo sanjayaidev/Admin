@@ -1,5 +1,5 @@
 const express = require('express');
-const { supabase, TABLES } = require('../lib/supabase');
+const { select, delete: deleteRows } = require('../lib/db');
 const logger = require('../lib/logger');
 
 const router = express.Router();
@@ -16,15 +16,14 @@ router.get('/', async (req, res, next) => {
     }
 
     // Get connections for this user within their organization
-    const { data, error } = await supabase
-      .from(TABLES.CONNECTIONS)
-      .select('id, provider, module, account_label, status, scopes, created_at')
-      .eq('user_id', userId)
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
+    const connections = await select(
+      'sm_connections',
+      { user_id: userId, org_id: orgId },
+      ['id', 'provider', 'module', 'account_label', 'status', 'scopes', 'created_at'],
+      { orderBy: 'created_at', orderDirection: 'DESC' }
+    );
 
-    if (error) throw error;
-    res.json({ connections: data });
+    res.json({ connections });
   } catch (err) {
     logger.error({ err }, '[connections] list failed');
     next(err);
@@ -42,14 +41,16 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     // Delete connection only if it belongs to this user and organization
-    const { error } = await supabase
-      .from(TABLES.CONNECTIONS)
-      .delete()
-      .eq('id', req.params.id)
-      .eq('user_id', userId)
-      .eq('org_id', orgId);
+    const deletedCount = await deleteRows('sm_connections', {
+      id: req.params.id,
+      user_id: userId,
+      org_id: orgId
+    });
 
-    if (error) throw error;
+    if (deletedCount === 0) {
+      return res.status(404).json({ error: 'not_found', message: 'Connection not found' });
+    }
+
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, '[connections] delete failed');

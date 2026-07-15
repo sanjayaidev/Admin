@@ -1,4 +1,3 @@
-const { supabase, TABLES } = require('../lib/supabase');
 const logger = require('../lib/logger');
 
 /**
