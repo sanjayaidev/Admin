@@ -106,7 +106,7 @@ function getModuleIcon(moduleName) {
 async function connect(moduleName) {
   try {
     const res = await fetch(
-      API + `/oauth/google/start?module=${encodeURIComponent(moduleName)}&returnTo=flow-builder`,
+      API + `/oauth/google/start?module=${encodeURIComponent(moduleName)}&returnTo=dashboard`,
       { headers: headers() }
     );
     const data = await res.json();
