@@ -109,17 +109,19 @@ router.get('/google/callback', async (req, res) => {
     const profile = userinfoRes.data;
 
     // Insert connection with org_id only (user_id removed from schema)
-    await insert(TABLES.CONNECTIONS, {
+    logger.info({ orgId: entry.orgId, module: entry.moduleName, email: profile.email }, '[oauth] Inserting connection');
+    const connection = await insert(TABLES.CONNECTIONS, {
       org_id: entry.orgId,  // Multi-tenant scoping
       provider: 'google',
       module: entry.moduleName, // scopes this account to the module it was connected for
       account_label: profile.email,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || '',
-      expires_at: new Date(tokens.expiry_date).toISOString(),
+      token_expiry: new Date(tokens.expiry_date).toISOString(),
       scopes: (tokens.scope || '').split(' '),
       status: 'active',
     });
+    logger.info({ connectionId: connection.id }, '[oauth] Connection inserted successfully');
 
     // Redirect back to your frontend UI. Falls back to deriving the base URL
     // from the incoming request if PUBLIC_BASE_URL/BASE_URL isn't set, so we
