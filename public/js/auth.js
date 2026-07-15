@@ -81,6 +81,12 @@ function updateNavbar(user) {
     existingUser.remove();
   }
   
+  // Update brand with organization name if available
+  const brand = navbar.querySelector('.brand');
+  if (brand && user.orgName) {
+    brand.textContent = user.orgName;
+  }
+  
   const userSection = document.createElement('div');
   userSection.className = 'navbar-user';
   userSection.style.cssText = 'display:flex; align-items:center; gap:12px; margin-left:auto;';

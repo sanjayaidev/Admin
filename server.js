@@ -876,6 +876,48 @@ app.delete('/api/roles/:id', requireRole(['admin']), async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ORGANIZATION ROUTES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET organization details (authenticated users)
+app.get('/api/organization', async (req, res) => {
+  try {
+    const token = req.cookies.session_token;
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    const user = await validateSession(token);
+    if (!user || !user.orgId) return res.status(404).json({ error: 'Organization not found' });
+
+    const org = await getOrganizationById(user.orgId);
+    if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+    res.json(org);
+  } catch (err) {
+    console.error('Error fetching organization:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT update organization (admin only)
+app.put('/api/organization', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Organization name is required' });
+
+    const { rows } = await pool.query(
+      `UPDATE organizations SET name=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
+      [name.trim(), req.user.orgId]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ error: 'Organization not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating organization:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // STATIC FILES  (must come after all API routes)
 // ══════════════════════════════════════════════════════════════════════════════
 
