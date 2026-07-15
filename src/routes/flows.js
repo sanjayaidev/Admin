@@ -1,5 +1,5 @@
 const express = require('express');
-const { select, insert, update, delete: del, query } = require('../lib/db');
+const { select, insert, update, delete: del } = require('../lib/db');
 const TABLES = require('../lib/db').TABLES;
 const { runFlow } = require('../lib/flowRunner');
 const sessionAuth = require('../middleware/sessionAuth');
@@ -97,7 +97,7 @@ router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
       return res.status(404).json({ error: 'flow_not_found' });
     }
     
-    const result = await runFlow(flows[0].id, req.user.id);
+    const result = await runFlow(flows[0].id, req.user.id, req.user.org_id);
     res.json(result);
   } catch (err) {
     logger.error({ err }, '[flows] run failed');

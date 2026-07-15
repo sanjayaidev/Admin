@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { supabase, TABLES } = require('../lib/supabase');
+const { select, insert } = require('../lib/db');
+const TABLES = require('../lib/db').TABLES;
 const { generateApiKey } = require('../lib/encryption');
 const logger = require('../lib/logger');
 
@@ -18,28 +19,32 @@ router.post('/register', express.json(), async (req, res, next) => {
       return res.status(400).json({ error: 'invalid_input', message: 'email and password (8+ chars) required' });
     }
 
-    const { data: existing } = await supabase.from(TABLES.USERS).select('id').eq('email', email).maybeSingle();
-    if (existing) {
+    const existing = await select(TABLES.USERS, { email }, ['id']);
+    if (existing && existing.length > 0) {
       return res.status(409).json({ error: 'email_taken' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const { data: user, error: userError } = await supabase
-      .from(TABLES.USERS)
-      .insert({ email, password_hash: passwordHash })
-      .select('id, email')
-      .single();
-
-    if (userError) throw userError;
+    const user = await insert(TABLES.USERS, { 
+      email, 
+      password_hash: passwordHash,
+      full_name: email.split('@')[0],
+      role: 'admin'
+    });
 
     const { raw, hash } = generateApiKey();
-    const { error: keyError } = await supabase
-      .from(TABLES.API_KEYS)
-      .insert({ user_id: user.id, key_hash: hash, label: 'default' });
+    await insert(TABLES.API_KEYS, { 
+      user_id: user.id, 
+      key_hash: hash, 
+      label: 'default',
+      org_id: user.org_id
+    });
 
-    if (keyError) throw keyError;
-
-    res.status(201).json({ user, apiKey: raw, message: 'Save this API key now - it will not be shown again.' });
+    res.status(201).json({ 
+      user: { id: user.id, email: user.email }, 
+      apiKey: raw, 
+      message: 'Save this API key now - it will not be shown again.' 
+    });
   } catch (err) {
     logger.error({ err }, '[auth] register failed');
     next(err);
@@ -54,26 +59,34 @@ router.post('/register', express.json(), async (req, res, next) => {
 router.post('/login', express.json(), async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
-    const { data: user, error } = await supabase
-      .from(TABLES.USERS)
-      .select('id, email, password_hash')
-      .eq('email', email)
-      .maybeSingle();
+    const users = await select(TABLES.USERS, { email }, ['id', 'email', 'password_hash', 'org_id', 'full_name', 'role']);
 
-    if (error) throw error;
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    if (!users || users.length === 0) {
+      return res.status(401).json({ error: 'invalid_credentials' });
+    }
+    
+    const user = users[0];
+    
+    if (!(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
     const { raw, hash } = generateApiKey();
-    const { error: keyError } = await supabase
-      .from(TABLES.API_KEYS)
-      .insert({ user_id: user.id, key_hash: hash, label: 'login' });
-
-    if (keyError) throw keyError;
+    await insert(TABLES.API_KEYS, { 
+      user_id: user.id, 
+      key_hash: hash, 
+      label: 'login',
+      org_id: user.org_id
+    });
 
     res.json({
-      user: { id: user.id, email: user.email },
+      user: { 
+        id: user.id, 
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        org_id: user.org_id
+      },
       apiKey: raw,
       message: 'New API key issued - save it now, it will not be shown again.',
     });

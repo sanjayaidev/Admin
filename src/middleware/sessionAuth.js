@@ -20,15 +20,15 @@ async function sessionAuth(req, res, next) {
       });
     }
 
-    if (!req.user.orgId) {
+    if (!req.user.org_id) {
       return res.status(403).json({ 
         error: 'no_organization', 
         message: 'User does not belong to any organization' 
       });
     }
 
-    // Attach orgId for downstream handlers
-    req.orgId = req.user.orgId;
+    // Attach orgId for downstream handlers (normalize to orgId)
+    req.orgId = req.user.org_id;
 
     next();
   } catch (err) {
