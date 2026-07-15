@@ -34,10 +34,7 @@ router.get('/google/start', sessionAuth, (req, res) => {
 
   cleanupExpiredStates();
   const state = crypto.randomBytes(24).toString('base64url');
-  // returnTo: which page initiated the connect, so the callback can send
-  // the user back to the flow builder canvas instead of always landing on
-  // the classic dashboard.
-  const returnTo = req.query.returnTo === 'flow-builder' ? 'flow-builder' : 'dashboard';
+  const returnTo = 'dashboard';
   pendingStates.set(state, { 
     userId: req.user.id, 
     orgId: req.user.org_id,  // Store org_id for multi-tenancy
@@ -127,8 +124,7 @@ router.get('/google/callback', async (req, res) => {
     // from the incoming request if PUBLIC_BASE_URL/BASE_URL isn't set, so we
     // never emit a literal "undefined" in the redirect location.
     const base = env.publicBaseUrl || `${req.protocol}://${req.get('host')}`;
-    const landingPath = entry.returnTo === 'flow-builder' ? '/flow-builder.html' : '/connected';
-    res.redirect(`${base}${landingPath}?provider=google&email=${encodeURIComponent(profile.email)}`);
+    res.redirect(`${base}/connected?provider=google&email=${encodeURIComponent(profile.email)}`);
   } catch (err) {
     logger.error({ err }, '[oauth] token exchange failed');
     res.status(500).send('OAuth token exchange failed.');

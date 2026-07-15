@@ -484,13 +484,12 @@ function buildInputFromFields(fields, idPrefix) {
 }
 
 // --- Resource dropdowns for the "Run an action" panel ---
-// Mirrors the flow-builder canvas's resource-loading logic so every module
-// (sheets, calendar, drive, forms, Business Profile locations/reviews/
-// posts, etc.) can be picked from a dropdown here too, instead of pasting
-// IDs. Results are cached by resourceType + parent field values, so once
-// something has been fetched once (e.g. "List accounts"), picking an action
-// that needs that same ID later reuses the cached list instead of forcing
-// another manual fetch.
+// Loads available resources (sheets, calendar, drive, forms, Business Profile
+// locations/reviews/posts, etc.) so they can be picked from a dropdown here
+// instead of pasting IDs. Results are cached by resourceType + parent field
+// values, so once something has been fetched once (e.g. "List accounts"),
+// picking an action that needs that same ID later reuses the cached list
+// instead of forcing another manual fetch.
 const resourceCache = {}; // key: `${resourceType}|${depValuesJoined}` -> [{value,label}]
 
 function dependsOnNames(dependsOn) {
