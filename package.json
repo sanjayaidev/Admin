@@ -12,6 +12,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",
@@ -21,7 +22,8 @@
     "node-cron": "^4.5.0",
     "nodemailer": "^9.0.1",
     "pg": "^8.11.5",
-    "redis": "^6.0.1"
+    "redis": "^6.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
