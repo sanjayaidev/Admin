@@ -10,7 +10,7 @@
 // connectors. Real branching isn't implemented server-side yet, so this
 // canvas enforces one outgoing + one incoming connector per node.
 
-const API = '';
+const API = '/api';
 let modulesCache = [];       // [{name, provider, actions, triggers}]
 let connectionsCache = [];   // [{id, provider, module, account_label, status}]
 let flowsCache = [];
@@ -56,7 +56,7 @@ async function init() {
 
 async function loadModules() {
   try {
-    const res = await fetch(API + '/api', { headers: headers() });
+    const res = await fetch(API + '/actions', { headers: headers() });
     const data = await res.json();
     modulesCache = res.ok ? (data.modules || []) : [];
     if (!res.ok) showToast('Could not load modules (' + (data.error || res.status) + ')', 'error');
@@ -789,7 +789,7 @@ async function loadResources(selectEl, resourceType, dependsOnField, currentFiel
         throw new Error(`Unknown resource type: ${resourceType}`);
     }
     
-    const res = await fetch(`${API}/api/${node.module}/${actionName}`, {
+    const res = await fetch(`${API}/actions/${node.module}/${actionName}`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ connectionId: node.connectionId, input: inputPayload }),
