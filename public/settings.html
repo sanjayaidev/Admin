@@ -228,6 +228,29 @@
           <button type="submit" class="btn btn-primary">Save System Settings</button>
         </form>
       </section>
+
+      <!-- Organization Settings (Admin Only) -->
+      <section class="settings-section" id="orgSettingsSection" style="display: none;">
+        <h2>🏢 Organization Settings</h2>
+        <p class="section-description">Manage your organization details. Only accessible by admins.</p>
+        
+        <form id="orgForm" class="settings-form">
+          <div class="form-group">
+            <label for="orgName">Organization Name</label>
+            <input type="text" id="orgName" placeholder="Your Company Name" required>
+          </div>
+          <div class="form-group">
+            <label for="orgSlug">Organization Slug</label>
+            <input type="text" id="orgSlug" placeholder="your-company" readonly style="background-color: #f3f4f6; cursor: not-allowed;">
+            <span class="hint">This is a unique identifier for your organization and cannot be changed.</span>
+          </div>
+          <div class="form-group">
+            <label for="orgCreatedAt">Created At</label>
+            <input type="text" id="orgCreatedAt" readonly style="background-color: #f3f4f6; cursor: not-allowed;">
+          </div>
+          <button type="submit" class="btn btn-primary">Update Organization</button>
+        </form>
+      </section>
   </div>
 
   <script src="/js/utils.js"></script>

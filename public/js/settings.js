@@ -24,6 +24,12 @@ async function initSettingsPage() {
   // Update navbar with user info (using auth.js function)
   window.updateNavbar(window.currentUser);
 
+  // Show organization settings for admins only
+  if (window.currentUser && window.currentUser.role === 'admin') {
+    document.getElementById('orgSettingsSection').style.display = 'block';
+    await loadOrganizationDetails();
+  }
+
   // Load user settings
   await loadUserSettings();
   await loadIntegrations();
@@ -53,6 +59,7 @@ function setupEventListeners() {
   document.getElementById('notificationForm').addEventListener('submit', saveNotificationPreferences);
   document.getElementById('invoiceForm').addEventListener('submit', saveInvoiceSettings);
   document.getElementById('systemForm').addEventListener('submit', saveSystemSettings);
+  document.getElementById('orgForm').addEventListener('submit', saveOrganizationSettings);
 
   // Test WhatsApp button
   document.getElementById('testWhatsappBtn').addEventListener('click', testWhatsAppConnection);
@@ -379,6 +386,57 @@ async function testWhatsAppConnection() {
     }
   } catch (error) {
     console.error('[Settings] Test WhatsApp error:', error);
+    alert('Network error. Please try again.');
+  }
+}
+
+// Load organization details (admin only)
+async function loadOrganizationDetails() {
+  console.log('[Settings] Loading organization details');
+
+  try {
+    const response = await fetch('/api/organization', {
+      credentials: 'include'
+    });
+
+    if (response.ok) {
+      const org = await response.json();
+      document.getElementById('orgName').value = org.name || '';
+      document.getElementById('orgSlug').value = org.slug || '';
+      document.getElementById('orgCreatedAt').value = org.created_at ? new Date(org.created_at).toLocaleDateString() : '';
+    }
+  } catch (error) {
+    console.error('[Settings] Error loading organization details:', error);
+  }
+}
+
+// Save organization settings (admin only)
+async function saveOrganizationSettings(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('orgName').value.trim();
+
+  try {
+    const response = await fetch('/api/organization', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name })
+    });
+
+    if (response.ok) {
+      alert('Organization updated successfully');
+      // Update navbar with new org name
+      if (window.currentUser) {
+        window.currentUser.orgName = name;
+        window.updateNavbar(window.currentUser);
+      }
+    } else {
+      const error = await response.json();
+      alert(error.error || 'Failed to update organization');
+    }
+  } catch (error) {
+    console.error('[Settings] Save organization error:', error);
     alert('Network error. Please try again.');
   }
 }
