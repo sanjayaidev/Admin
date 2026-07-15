@@ -3,13 +3,11 @@ const crypto = require('crypto');
 const { google } = require('googleapis');
 const env = require('../config/env');
 const { supabase, TABLES } = require('../lib/supabase');
-const { getModule } = require('../modules');
-const apiKeyAuth = require('../middleware/apiKeyAuth');
 const logger = require('../lib/logger');
 
 const router = express.Router();
 
-// In-memory state store keyed by random state token -> { userId, expiresAt }.
+// In-memory state store keyed by random state token -> { userId, orgId, expiresAt }.
 // Fine for a single-instance deployment; move to Supabase/Redis if you scale
 // to multiple server instances behind a load balancer.
 const pendingStates = new Map();
@@ -22,13 +20,22 @@ function cleanupExpiredStates() {
 }
 
 // GET /oauth/google/start?module=gmail
-// Requires API key auth so we know which user is connecting.
-router.get('/google/start', apiKeyAuth, (req, res) => {
+// Uses session auth (user already authenticated via ClientPM session)
+router.get('/google/start', (req, res) => {
   const moduleName = req.query.module;
-  const mod = moduleName && getModule(moduleName);
+  
+  // Get user from session (attached by parent router's auth middleware)
+  const userId = req.user?.id;
+  const orgId = req.user?.orgId;
+  
+  if (!userId || !orgId) {
+    return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
+  }
 
-  if (!mod || mod.provider !== 'google') {
-    return res.status(400).json({ error: 'invalid_module', message: 'Provide ?module=<a registered google module>' });
+  // Validate module exists
+  const validModules = ['gmail', 'calendar', 'sheets', 'docs', 'drive', 'forms', 'googleBusinessProfile'];
+  if (!moduleName || !validModules.includes(moduleName)) {
+    return res.status(400).json({ error: 'invalid_module', message: 'Provide ?module=<valid_google_module>' });
   }
 
   cleanupExpiredStates();
@@ -36,8 +43,8 @@ router.get('/google/start', apiKeyAuth, (req, res) => {
   // returnTo: which page initiated the connect, so the callback can send
   // the user back to the flow builder canvas instead of always landing on
   // the classic dashboard.
-  const returnTo = req.query.returnTo === 'flow-builder' ? 'flow-builder' : 'dashboard';
-  pendingStates.set(state, { userId: req.user.id, moduleName, returnTo, expiresAt: Date.now() + 10 * 60 * 1000 });
+  const returnTo = req.query.returnTo === 'flow-builder' ? 'flow-builder' : 'connections';
+  pendingStates.set(state, { userId, orgId, moduleName, returnTo, expiresAt: Date.now() + 10 * 60 * 1000 });
 
   const client = new google.auth.OAuth2(env.google.clientId, env.google.clientSecret, env.google.redirectUri);
 
@@ -45,8 +52,9 @@ router.get('/google/start', apiKeyAuth, (req, res) => {
   // the callback uses it to look up the connected account's email address,
   // so without it the userinfo request 401s even though the module scopes
   // (e.g. Gmail) were granted correctly.
+  const moduleScopes = getModuleScopes(moduleName);
   const scope = Array.from(new Set([
-    ...mod.requiredScopes,
+    ...moduleScopes,
     'https://www.googleapis.com/auth/userinfo.email',
   ]));
 
@@ -101,10 +109,12 @@ router.get('/google/callback', async (req, res) => {
     });
     const profile = userinfoRes.data;
 
+    // Store connection with org_id for multi-tenancy
     const { error: insertError } = await supabase.from(TABLES.CONNECTIONS).insert({
       user_id: entry.userId,
+      org_id: entry.orgId,
       provider: 'google',
-      module: entry.moduleName, // scopes this account to the module it was connected for (fixes "one account shared by every module")
+      module: entry.moduleName, // scopes this account to the module it was connected for
       account_label: profile.email,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || '',
@@ -118,16 +128,30 @@ router.get('/google/callback', async (req, res) => {
       return res.status(500).send('Failed to save connection.');
     }
 
-    // Redirect back to your frontend UI. Falls back to deriving the base URL
-    // from the incoming request if PUBLIC_BASE_URL/BASE_URL isn't set, so we
-    // never emit a literal "undefined" in the redirect location.
+    // Redirect back to your frontend UI
     const base = env.publicBaseUrl || `${req.protocol}://${req.get('host')}`;
-    const landingPath = entry.returnTo === 'flow-builder' ? '/flow-builder.html' : '/connected';
+    const landingPath = entry.returnTo === 'flow-builder' ? '/flow-builder.html' : '/connections.html';
     res.redirect(`${base}${landingPath}?provider=google&email=${encodeURIComponent(profile.email)}`);
   } catch (err) {
     logger.error({ err }, '[oauth] token exchange failed');
     res.status(500).send('OAuth token exchange failed.');
   }
 });
+
+/**
+ * Get OAuth scopes for a specific Google module
+ */
+function getModuleScopes(moduleName) {
+  const scopeMap = {
+    gmail: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly'],
+    calendar: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
+    sheets: ['https://www.googleapis.com/auth/spreadsheets'],
+    docs: ['https://www.googleapis.com/auth/documents'],
+    drive: ['https://www.googleapis.com/auth/drive.file'],
+    forms: ['https://www.googleapis.com/auth/forms.body'],
+    googleBusinessProfile: ['https://www.googleapis.com/auth/business.manage'],
+  };
+  return scopeMap[moduleName] || [];
+}
 
 module.exports = router;

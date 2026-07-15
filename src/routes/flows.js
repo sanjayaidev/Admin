@@ -1,20 +1,25 @@
 const express = require('express');
 const { supabase, TABLES } = require('../lib/supabase');
 const { runFlow } = require('../lib/flowRunner');
-const apiKeyAuth = require('../middleware/apiKeyAuth');
-const { actionRateLimiter } = require('../middleware/rateLimiter');
 const logger = require('../lib/logger');
 
 const router = express.Router();
-router.use(apiKeyAuth);
 
-// GET /flows - list this user's flows
+// GET /flows - list this user's flows (filtered by org_id for multi-tenancy)
 router.get('/', async (req, res, next) => {
   try {
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+    
+    if (!userId || !orgId) {
+      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
+    }
+
     const { data, error } = await supabase
       .from(TABLES.FLOWS)
       .select('*, sm_flow_steps(*)')
-      .eq('user_id', req.user.id)
+      .eq('user_id', userId)
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     res.json({ flows: data });
@@ -26,6 +31,13 @@ router.get('/', async (req, res, next) => {
 // POST /flows { name, triggerType, triggerConfig, steps: [{ module, action, connectionId, inputMap, condition }] }
 router.post('/', express.json(), async (req, res, next) => {
   try {
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+    
+    if (!userId || !orgId) {
+      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
+    }
+
     const { name, triggerType = 'manual', triggerConfig = {}, steps = [] } = req.body || {};
     if (!name || !Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json({ error: 'invalid_input', message: 'name and at least one step required' });
@@ -33,7 +45,7 @@ router.post('/', express.json(), async (req, res, next) => {
 
     const { data: flow, error: flowError } = await supabase
       .from(TABLES.FLOWS)
-      .insert({ user_id: req.user.id, name, trigger_type: triggerType, trigger_config: triggerConfig })
+      .insert({ user_id: userId, org_id: orgId, name, trigger_type: triggerType, trigger_config: triggerConfig })
       .select()
       .single();
     if (flowError) throw flowError;
@@ -61,16 +73,24 @@ router.post('/', express.json(), async (req, res, next) => {
 // POST /flows/:id/run - executes the flow's steps in order right now (manual trigger)
 router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
   try {
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+    
+    if (!userId || !orgId) {
+      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
+    }
+
     const { data: flow, error } = await supabase
       .from(TABLES.FLOWS)
       .select('id')
       .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
+      .eq('user_id', userId)
+      .eq('org_id', orgId)
       .maybeSingle();
     if (error) throw error;
     if (!flow) return res.status(404).json({ error: 'flow_not_found' });
 
-    const result = await runFlow(flow.id, req.user.id);
+    const result = await runFlow(flow.id, userId, orgId);
     res.json(result);
   } catch (err) {
     logger.error({ err }, '[flows] run failed');
@@ -81,7 +101,14 @@ router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
 // DELETE /flows/:id
 router.delete('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.from(TABLES.FLOWS).delete().eq('id', req.params.id).eq('user_id', req.user.id);
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+    
+    if (!userId || !orgId) {
+      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
+    }
+
+    const { error } = await supabase.from(TABLES.FLOWS).delete().eq('id', req.params.id).eq('user_id', userId).eq('org_id', orgId);
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
