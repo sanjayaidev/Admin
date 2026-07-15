@@ -2,25 +2,31 @@
 # Dependencies
 node_modules/
 
-# Logs
-*.log
-
 # Environment variables
 .env
 .env.local
 .env.*
 
-# IDE and editor settings
+# Logs
+*.log
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Build and distribution directories
-build/
+# Build outputs
 dist/
+build/
 target/
 
 # Python cache
@@ -33,11 +39,7 @@ __pycache__/
 *.tmp
 *.temp
 
-# Coverage reports
-coverage/
-htmlcov/
-
-# Compression files
+# Compressed files
 *.zip
 *.gz
 *.tar
@@ -56,9 +58,4 @@ htmlcov/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
-
 ```

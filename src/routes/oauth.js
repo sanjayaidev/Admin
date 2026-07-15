@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { google } = require('googleapis');
 const env = require('../config/env');
-const { supabase, TABLES } = require('../lib/supabase');
+const { insert } = require('../lib/db');
 const logger = require('../lib/logger');
 
 const router = express.Router();
@@ -110,7 +110,7 @@ router.get('/google/callback', async (req, res) => {
     const profile = userinfoRes.data;
 
     // Store connection with org_id for multi-tenancy
-    const { error: insertError } = await supabase.from(TABLES.CONNECTIONS).insert({
+    await insert('sm_connections', {
       user_id: entry.userId,
       org_id: entry.orgId,
       provider: 'google',
@@ -122,11 +122,6 @@ router.get('/google/callback', async (req, res) => {
       scopes: (tokens.scope || '').split(' '),
       status: 'active',
     });
-
-    if (insertError) {
-      logger.error({ err: insertError }, '[oauth] failed to store connection');
-      return res.status(500).send('Failed to save connection.');
-    }
 
     // Redirect back to your frontend UI
     const base = env.publicBaseUrl || `${req.protocol}://${req.get('host')}`;

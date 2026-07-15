@@ -24,7 +24,10 @@ const {
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 
-// ── Google Modules Integration (Flow Builder) ─────────────────────────────────\n// Mount the modules API routes for Gmail, Calendar, Sheets, Docs, Drive, Forms, GBP\n// These routes are protected by requireAuth middleware above\nconst oauthRouter = require('./src/routes/oauth');
+// ── Google Modules Integration (Flow Builder) ─────────────────────────────────
+// Mount the modules API routes for Gmail, Calendar, Sheets, Docs, Drive, Forms, GBP
+// These routes are protected by requireAuth middleware above
+const oauthRouter = require('./src/routes/oauth');
 const connectionsRouter = require('./src/routes/connections');
 const flowsRouter = require('./src/routes/flows');
 const webhooksRouter = require('./src/routes/webhooks');
