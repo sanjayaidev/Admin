@@ -1,4 +1,4 @@
-const { pool, select, insert, update } = require('./db');
+const { supabase, TABLES } = require('./supabase');
 const { getModule } = require('../modules');
 const { getConnection } = require('./connections');
 const logger = require('./logger');
@@ -48,18 +48,21 @@ function evaluateCondition(condition, results) {
  * a single call into a module's action handler. Logs the run to
  * sm_flow_runs for visibility.
  */
-async function runFlow(flowId, userId, orgId) {
-  const steps = await select(
-    'sm_flow_steps',
-    { flow_id: flowId },
-    ['*'],
-    { orderBy: 'order_index', orderDirection: 'ASC' }
-  );
+async function runFlow(flowId, userId) {
+  const { data: steps, error: stepsError } = await supabase
+    .from(TABLES.FLOW_STEPS)
+    .select('*')
+    .eq('flow_id', flowId)
+    .order('order_index', { ascending: true });
 
-  const run = await insert('sm_flow_runs', { 
-    flow_id: flowId, 
-    status: 'running' 
-  });
+  if (stepsError) throw stepsError;
+
+  const { data: run, error: runInsertError } = await supabase
+    .from(TABLES.FLOW_RUNS)
+    .insert({ flow_id: flowId, status: 'running' })
+    .select()
+    .single();
+  if (runInsertError) throw runInsertError;
 
   const results = {};
   let skipUntilStepId = null;
@@ -82,27 +85,24 @@ async function runFlow(flowId, userId, orgId) {
 
       const input = resolveInput(step.input_map, results);
       const parsed = action.inputSchema.parse(input);
-      const connection = await getConnection(step.connection_id, userId, orgId);
+      const connection = await getConnection(step.connection_id, userId);
 
       const output = await action.handler({ connection, input: parsed });
       results[step.order_index] = output;
     }
 
-    await update('sm_flow_runs', { 
-      status: 'success', 
-      finished_at: new Date().toISOString(), 
-      step_results: results 
-    }, { id: run.id });
+    await supabase
+      .from(TABLES.FLOW_RUNS)
+      .update({ status: 'success', finished_at: new Date().toISOString(), step_results: results })
+      .eq('id', run.id);
 
     return { runId: run.id, status: 'success', results };
   } catch (err) {
     logger.error({ err, flowId }, '[flowRunner] run failed');
-    await update('sm_flow_runs', { 
-      status: 'failed', 
-      finished_at: new Date().toISOString(), 
-      step_results: results, 
-      error: err.message 
-    }, { id: run.id });
+    await supabase
+      .from(TABLES.FLOW_RUNS)
+      .update({ status: 'failed', finished_at: new Date().toISOString(), step_results: results, error: err.message })
+      .eq('id', run.id);
 
     return { runId: run.id, status: 'failed', error: err.message, results };
   }

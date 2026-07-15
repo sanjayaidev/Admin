@@ -13,16 +13,7 @@ node_modules/
 # Coverage reports
 coverage/
 htmlcov/
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-Thumbs.db
+.coverage
 
 # Build outputs
 dist/
@@ -37,7 +28,21 @@ __pycache__/
 
 # Temporary files
 *.tmp
-*.temp
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.vscode/
+.idea/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
 # Compressed files
 *.zip
@@ -58,4 +63,8 @@ __pycache__/
 *.Z
 *.lz
 *.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```

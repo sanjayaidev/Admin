@@ -1,6 +1,6 @@
 // Node-canvas flow builder. Talks to the exact same backend as the classic
-// dashboard (public/js/app.js) - /connections, /oauth/google/start,
-// /flows - so anything built here is a real, runnable flow, not a mockup.
+// dashboard - /connections, /oauth/google/start, /flows - so anything built 
+// here is a real, runnable flow, not a mockup.
 //
 // Simplification (matches the linear flowRunner - see src/lib/flowRunner.js):
 // execution order is a single chain. The canvas lets you draw and remove
@@ -11,7 +11,6 @@
 // canvas enforces one outgoing + one incoming connector per node.
 
 const API = '';
-let apiKey = localStorage.getItem('sm_api_key') || null;
 let modulesCache = [];       // [{name, provider, actions, triggers}]
 let connectionsCache = [];   // [{id, provider, module, account_label, status}]
 let flowsCache = [];
@@ -30,8 +29,9 @@ const ZOOM_MIN = 0.35, ZOOM_MAX = 1.75;
 const NODE_W = 190;
 const NODE_H = 64; // approximate rendered height, used for socket + edge geometry
 
+// Use session-based auth (cookies) instead of API key
 function headers() {
-  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+  return { 'Content-Type': 'application/json' };
 }
 
 function showToast(msg, type) {
@@ -46,12 +46,6 @@ function showToast(msg, type) {
 
 async function init() {
   wireStaticButtons();
-  if (!apiKey) {
-    document.getElementById('keyPill').textContent = 'no API key — log in on the classic dashboard';
-    showToast('No API key found. Log in or paste a key on the classic dashboard first.', 'error');
-    return;
-  }
-  document.getElementById('keyPill').textContent = apiKey.slice(0, 14) + '...';
   await loadModules();
   await loadConnections();
   await loadFlows();
