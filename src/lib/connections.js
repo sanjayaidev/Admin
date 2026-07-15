@@ -29,7 +29,7 @@ async function getConnection(connectionId, userId, orgId) {
 
   let accessToken = data.access_token;
   const refreshToken = data.refresh_token;
-  const expiresAt = new Date(data.expires_at).getTime();
+  const expiresAt = new Date(data.token_expiry).getTime();
 
   if (data.provider === 'google' && expiresAt - Date.now() < REFRESH_BUFFER_MS) {
     const refreshed = await refreshGoogleToken(refreshToken);
@@ -37,7 +37,7 @@ async function getConnection(connectionId, userId, orgId) {
 
     await update(TABLES.CONNECTIONS, {
       access_token: accessToken,
-      expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+      token_expiry: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
     }, { id: connectionId });
 
     logger.info(`[connections] refreshed google token for connection ${connectionId}`);
