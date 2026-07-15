@@ -17,80 +17,26 @@
     <a href="/tasks.html">Tasks</a>
     <a href="/calendar.html">Calendar</a>
     <a href="/team.html">Team</a>
+    <a href="/flow-builder.html">Flow Builder</a>
     <a href="/settings.html" class="active">Settings</a>
     <a href="/profile.html">Profile</a>
   </nav>
-
+  
   <div class="page">
     <div class="page-header">
       <h1>⚙️ Settings</h1>
     </div>
 
-    <!-- Google Integrations Section -->
+    <!-- Flow Builder Integration Link -->
     <section class="settings-section">
-      <h2>🔗 Google Integrations</h2>
-      <p class="section-description">Connect your Google account to enable calendar sync, file storage, and more.</p>
+      <h2>🔗 Google Integrations & Automation</h2>
+      <p class="section-description">Connect Google services (Calendar, Drive, Sheets, Docs, Forms, Gmail, Business Profile) and build automated workflows in our Flow Builder.</p>
       
-      <div class="integration-grid">
-        <!-- Google Calendar -->
-        <div class="integration-card" data-service="google_calendar">
-          <div class="integration-icon">📅</div>
-          <h3>Google Calendar</h3>
-          <p>Sync events and meetings</p>
-          <div class="integration-status">
-            <span class="status-badge disconnected">Disconnected</span>
-          </div>
-          <button class="btn btn-connect">Connect</button>
-          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-        </div>
-
-        <!-- Google Drive -->
-        <div class="integration-card" data-service="google_drive">
-          <div class="integration-icon">📁</div>
-          <h3>Google Drive</h3>
-          <p>Store client files and documents</p>
-          <div class="integration-status">
-            <span class="status-badge disconnected">Disconnected</span>
-          </div>
-          <button class="btn btn-connect">Connect</button>
-          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-        </div>
-
-        <!-- Google Sheets -->
-        <div class="integration-card" data-service="google_sheets">
-          <div class="integration-icon">📊</div>
-          <h3>Google Sheets</h3>
-          <p>Export reports and data</p>
-          <div class="integration-status">
-            <span class="status-badge disconnected">Disconnected</span>
-          </div>
-          <button class="btn btn-connect">Connect</button>
-          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-        </div>
-
-        <!-- Gmail / Apps Script -->
-        <div class="integration-card" data-service="gmail">
-          <div class="integration-icon">📧</div>
-          <h3>Gmail (Apps Script)</h3>
-          <p>Send emails via Apps Script</p>
-          <div class="integration-status">
-            <span class="status-badge disconnected">Disconnected</span>
-          </div>
-          <button class="btn btn-connect">Connect</button>
-          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-        </div>
-
-        <!-- Google Meet -->
-        <div class="integration-card" data-service="google_meet">
-          <div class="integration-icon">🎥</div>
-          <h3>Google Meet</h3>
-          <p>Generate meeting links</p>
-          <div class="integration-status">
-            <span class="status-badge disconnected">Disconnected</span>
-          </div>
-          <button class="btn btn-connect">Connect</button>
-          <button class="btn btn-disconnect" style="display: none;">Disconnect</button>
-        </div>
+      <div class="integration-cta">
+        <a href="/flow-builder.html" class="btn btn-primary btn-large">
+          🚀 Open Flow Builder
+        </a>
+        <p class="hint">Manage all your Google connections and create automation flows in one place.</p>
       </div>
     </section>
 
@@ -168,64 +114,6 @@
           </div>
 
           <button type="submit" class="btn btn-primary">Save Preferences</button>
-        </form>
-      </section>
-
-      <!-- Invoice Settings -->
-      <section class="settings-section">
-        <h2>📄 Invoice Settings</h2>
-        <p class="section-description">Configure invoice generation and payment settings.</p>
-        
-        <form id="invoiceForm" class="settings-form">
-          <div class="form-group">
-            <label for="invoicePrefix">Invoice Number Prefix</label>
-            <input type="text" id="invoicePrefix" value="INV" placeholder="INV">
-          </div>
-          <div class="form-group">
-            <label for="taxRate">Tax Rate (%)</label>
-            <input type="number" id="taxRate" value="18" min="0" max="100" step="0.1">
-          </div>
-          <div class="form-group">
-            <label for="currency">Currency</label>
-            <select id="currency">
-              <option value="USD">USD ($)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="GBP">GBP (£)</option>
-              <option value="INR">INR (₹)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="paymentTerms">Default Payment Terms (days)</label>
-            <input type="number" id="paymentTerms" value="30" min="1">
-          </div>
-          <button type="submit" class="btn btn-primary">Save Invoice Settings</button>
-        </form>
-      </section>
-
-      <!-- System Settings -->
-      <section class="settings-section">
-        <h2>⚙️ System Settings</h2>
-        <p class="section-description">General application configuration.</p>
-        
-        <form id="systemForm" class="settings-form">
-          <div class="form-group">
-            <label for="appName">Application Name</label>
-            <input type="text" id="appName" value="ClientPM">
-          </div>
-          <div class="form-group">
-            <label for="timezone">Timezone</label>
-            <select id="timezone">
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">Eastern Time (ET)</option>
-              <option value="America/Chicago">Central Time (CT)</option>
-              <option value="America/Los_Angeles">Pacific Time (PT)</option>
-              <option value="Europe/London">London (GMT)</option>
-              <option value="Europe/Paris">Paris (CET)</option>
-              <option value="Asia/Kolkata">India (IST)</option>
-              <option value="Asia/Tokyo">Tokyo (JST)</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-primary">Save System Settings</button>
         </form>
       </section>
 
