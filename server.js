@@ -79,7 +79,7 @@ app.post('/api/auth/login', async (req, res) => {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role });
+    res.json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role, token });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -105,7 +105,7 @@ app.post('/api/auth/signup', async (req, res) => {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.status(201).json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role });
+    res.status(201).json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role, token });
   } catch (err) {
     console.error('Signup error:', err);
     if (err.code === '23505' && err.constraint === 'users_email_key')
