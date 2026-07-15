@@ -29,7 +29,6 @@ const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 // These routes are protected by requireAuth middleware above
 const oauthRouter = require('./src/routes/oauth');
 const connectionsRouter = require('./src/routes/connections');
-const flowsRouter = require('./src/routes/flows');
 const webhooksRouter = require('./src/routes/webhooks');
 const actionRouter = require('./src/routes/actionRouter');
 
@@ -216,7 +215,6 @@ app.use('/api', requireAuth);
 // These routes use session auth from requireAuth above
 app.use('/api/oauth', oauthRouter);
 app.use('/api/connections', connectionsRouter);
-app.use('/api/flows', flowsRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/actions', actionRouter);
 
