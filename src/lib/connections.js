@@ -7,7 +7,7 @@ const logger = require('./logger');
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh if expiring within 5 min
 
 /**
- * Loads a connection row owned by userId and orgId, and refreshes the access token
+ * Loads a connection row owned by orgId, and refreshes the access token
  * proactively if it's near expiry (rather than waiting for the provider
  * to return a 401).
  *
@@ -19,13 +19,12 @@ async function getConnection(connectionId, userId, orgId) {
     TABLES.CONNECTIONS,
     { 
       id: connectionId,
-      user_id: userId,
-      org_id: orgId
+      org_id: orgId  // org_id only filter (user_id removed from schema)
     }
   );
   
   const data = connections[0];
-  if (!data) throw Object.assign(new Error('Connection not found or not owned by this user'), { status: 404, code: 'connection_not_found' });
+  if (!data) throw Object.assign(new Error('Connection not found or not owned by this org'), { status: 404, code: 'connection_not_found' });
   if (data.status !== 'active') throw Object.assign(new Error(`Connection is ${data.status}`), { status: 409, code: 'connection_inactive' });
 
   let accessToken = data.access_token;

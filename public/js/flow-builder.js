@@ -65,11 +65,33 @@ async function loadModules() {
 
 async function loadConnections() {
   try {
+    console.log('[FlowBuilder] Loading connections...');
     const res = await fetch(API + '/connections', { headers: headers() });
-    const data = await res.json();
+    console.log('[FlowBuilder] Connections response status:', res.status);
+    const text = await res.text();
+    console.log('[FlowBuilder] Connections response body:', text.substring(0, 500));
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('[FlowBuilder] Failed to parse connections JSON:', e);
+      showToast('Server returned invalid JSON for connections', 'error');
+      connectionsCache = [];
+      return;
+    }
+    
     connectionsCache = res.ok ? (data.connections || []) : [];
-    if (!res.ok) showToast('Could not load connections (' + (data.error || res.status) + ')', 'error');
-  } catch (e) { showToast('Network error loading connections: ' + e.message, 'error'); }
+    if (!res.ok) {
+      console.error('[FlowBuilder] Error loading connections:', data);
+      showToast('Could not load connections (' + (data.error || res.status) + ')', 'error');
+    } else {
+      console.log('[FlowBuilder] Loaded', connectionsCache.length, 'connections');
+    }
+  } catch (e) { 
+    console.error('[FlowBuilder] Network error loading connections:', e);
+    showToast('Network error loading connections: ' + e.message, 'error'); 
+  }
 }
 
 async function loadFlows() {
