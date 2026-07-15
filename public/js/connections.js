@@ -1,30 +1,28 @@
-// Connections page - manage Google OAuth connections for all modules
+// Connections management page - session-based auth (no API key)
 const API = '';
-let apiKey = localStorage.getItem('sm_api_key') || null;
+
 let modulesCache = [];
 let connectionsCache = [];
 
 function headers() {
-  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
-}
-
-function showMsg(container, msg, type) {
-  if (!container) return;
-  container.innerHTML = msg ? `<div class="msg ${type || ''}">${msg}</div>` : '';
+  return { 'Content-Type': 'application/json' };
 }
 
 async function init() {
-  const keyPill = document.getElementById('keyPill');
-  if (!apiKey) {
-    keyPill.textContent = 'no API key — log in on the classic dashboard';
-    showMsg(document.getElementById('banner'), 'No API key found. Log in or paste a key on the classic dashboard first.', 'error');
-    return;
-  }
-  keyPill.textContent = apiKey.slice(0, 14) + '...';
-  
   await loadModules();
   await loadConnections();
   renderModuleList();
+  
+  // Check for OAuth callback params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('provider') === 'google') {
+    const email = urlParams.get('email');
+    showBanner(`Successfully connected ${email}`, 'success');
+    // Clean URL
+    window.history.replaceState({}, document.title, '/connections.html');
+    // Refresh connections
+    setTimeout(() => loadConnections().then(renderModuleList), 500);
+  }
 }
 
 async function loadModules() {
@@ -32,8 +30,9 @@ async function loadModules() {
     const res = await fetch(API + '/api', { headers: headers() });
     const data = await res.json();
     modulesCache = res.ok ? (data.modules || []) : [];
-    if (!res.ok) showMsg(document.getElementById('banner'), 'Could not load modules (' + (data.error || res.status) + ')', 'error');
-  } catch (e) { showMsg(document.getElementById('banner'), 'Network error loading modules: ' + e.message, 'error'); }
+  } catch (e) {
+    console.error('Failed to load modules:', e);
+  }
 }
 
 async function loadConnections() {
@@ -41,87 +40,118 @@ async function loadConnections() {
     const res = await fetch(API + '/connections', { headers: headers() });
     const data = await res.json();
     connectionsCache = res.ok ? (data.connections || []) : [];
-    if (!res.ok) showMsg(document.getElementById('banner'), 'Could not load connections (' + (data.error || res.status) + ')', 'error');
-  } catch (e) { showMsg(document.getElementById('banner'), 'Network error loading connections: ' + e.message, 'error'); }
+  } catch (e) {
+    console.error('Failed to load connections:', e);
+  }
 }
 
-function providerFor(moduleName) {
-  const mod = modulesCache.find(m => m.name === moduleName);
-  return mod ? mod.provider : 'google';
-}
-
-function connectionsForModule(moduleObjOrName) {
-  const name = typeof moduleObjOrName === 'string' ? moduleObjOrName : moduleObjOrName.name;
-  const provider = providerFor(name);
-  return connectionsCache.filter(c =>
-    c.status === 'active' &&
-    c.provider === provider &&
-    (c.module ? c.module === name : true)
-  );
+function getConnectionsForModule(moduleName) {
+  return connectionsCache.filter(c => c.module === moduleName && c.status === 'active');
 }
 
 function renderModuleList() {
-  const el = document.getElementById('moduleList');
-  el.innerHTML = modulesCache.map(m => {
-    const conns = connectionsForModule(m);
-    const connected = conns.length > 0;
+  const container = document.getElementById('moduleList');
+  if (!container) return;
+  
+  if (modulesCache.length === 0) {
+    container.innerHTML = '<div class="empty">Loading modules...</div>';
+    return;
+  }
+  
+  const html = modulesCache.map(mod => {
+    const connections = getConnectionsForModule(mod.name);
+    const isConnected = connections.length > 0;
+    
     return `
       <div class="module-row">
         <div class="module-name">
-          <span class="socket ${connected ? 'on' : ''}"></span>
-          <div>
-            <div>${m.name}</div>
-            <div class="conn-label">
-              ${connected ? conns.map(c => `
-                <span class="conn-chip">${c.account_label}
-                  <button type="button" class="conn-chip-x" data-disconnect="${c.id}" title="Disconnect this account">×</button>
-                </span>`).join(' ') : 'not connected'}
-            </div>
-          </div>
+          <span class="socket ${isConnected ? 'on' : ''}"></span>
+          <span>${getModuleIcon(mod.name)} ${mod.name}</span>
         </div>
-        <button class="btn small ${connected ? 'ghost' : ''}" data-connect-module="${m.name}">${connected ? '+ add another' : 'connect'}</button>
-      </div>`;
-  }).join('') || '<div class="empty">No modules registered on the server.</div>';
+        <div style="flex:1; margin-left:20px;">
+          ${isConnected ? `
+            <div class="conn-label">
+              ${connections.map(c => `
+                <span class="conn-chip">
+                  ${c.account_label}
+                  <button class="conn-chip-x" onclick="disconnect('${c.id}')">×</button>
+                </span>
+              `).join('')}
+            </div>
+          ` : '<span style="color:var(--ink-dim);font-size:12px;">No connections</span>'}
+        </div>
+        <button class="btn ${isConnected ? 'ghost' : ''}" onclick="connect('${mod.name}')">
+          ${isConnected ? 'Connect Another' : 'Connect'}
+        </button>
+      </div>
+    `;
+  }).join('');
+  
+  container.innerHTML = html;
 }
 
-async function disconnectConnection(id) {
-  if (!confirm('Disconnect this account? Any flow steps using it will stop working until you pick another account.')) return;
-  try {
-    const res = await fetch(`${API}/connections/${id}`, { method: 'DELETE', headers: headers() });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      showMsg(document.getElementById('banner'), data.message || 'Could not disconnect', 'error');
-      return;
-    }
-    await loadConnections();
-    renderModuleList();
-    showMsg(document.getElementById('banner'), 'Account disconnected.', 'success');
-  } catch (e) { showMsg(document.getElementById('banner'), 'Network error: ' + e.message, 'error'); }
+function getModuleIcon(moduleName) {
+  const icons = {
+    gmail: '📧',
+    calendar: '📅',
+    sheets: '📊',
+    docs: '📄',
+    drive: '📁',
+    forms: '📝',
+    googleBusinessProfile: '🏢'
+  };
+  return icons[moduleName] || '🔌';
 }
 
-async function connectModule(moduleName) {
+async function connect(moduleName) {
   try {
-    const res = await fetch(`${API}/oauth/google/start?module=${moduleName}&returnTo=connections`, { headers: headers() });
+    const res = await fetch(
+      API + `/oauth/google/start?module=${encodeURIComponent(moduleName)}&returnTo=flow-builder`,
+      { headers: headers() }
+    );
     const data = await res.json();
-    if (data.authUrl) location.href = data.authUrl;
-    else showMsg(document.getElementById('banner'), data.message || 'Could not start connection', 'error');
-  } catch (e) { showMsg(document.getElementById('banner'), 'Network error: ' + e.message, 'error'); }
+    
+    if (res.ok && data.authUrl) {
+      window.location.href = data.authUrl;
+    } else {
+      showBanner(data.error || 'Failed to start OAuth flow', 'error');
+    }
+  } catch (e) {
+    showBanner('Network error: ' + e.message, 'error');
+  }
 }
 
-// Event delegation for module list
-document.addEventListener('click', (e) => {
-  const connectBtn = e.target.closest('[data-connect-module]');
-  if (connectBtn) {
-    e.preventDefault();
-    connectModule(connectBtn.dataset.connectModule);
-    return;
+async function disconnect(connectionId) {
+  if (!confirm('Remove this connection?')) return;
+  
+  try {
+    const res = await fetch(API + `/connections/${connectionId}`, {
+      method: 'DELETE',
+      headers: headers()
+    });
+    
+    if (res.ok) {
+      showBanner('Connection removed', 'success');
+      await loadConnections();
+      renderModuleList();
+    } else {
+      const data = await res.json();
+      showBanner(data.error || 'Failed to disconnect', 'error');
+    }
+  } catch (e) {
+    showBanner('Network error: ' + e.message, 'error');
   }
-  const disconnectBtn = e.target.closest('[data-disconnect]');
-  if (disconnectBtn) {
-    e.preventDefault();
-    disconnectConnection(disconnectBtn.dataset.disconnect);
-  }
-});
+}
+
+function showBanner(msg, type) {
+  const banner = document.getElementById('banner');
+  if (!banner) return;
+  
+  banner.innerHTML = `<div class="msg ${type}">${msg}</div>`;
+  setTimeout(() => {
+    banner.innerHTML = '';
+  }, 4000);
+}
 
 // Initialize on DOM ready
 if (document.readyState === 'loading') {

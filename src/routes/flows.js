@@ -1,68 +1,43 @@
 const express = require('express');
-const { pool, select, insert, delete: deleteRows } = require('../lib/db');
+const { select, insert, update, delete: del, query } = require('../lib/db');
+const TABLES = require('../lib/db').TABLES;
 const { runFlow } = require('../lib/flowRunner');
+const sessionAuth = require('../middleware/sessionAuth');
+const { actionRateLimiter } = require('../middleware/rateLimiter');
 const logger = require('../lib/logger');
 
 const router = express.Router();
+router.use(sessionAuth);
 
-// Simple rate limiter for manual flow runs
-function actionRateLimiter(req, res, next) {
-  const now = Date.now();
-  const key = `ratelimit:${req.user?.id}:${req.params.id}`;
-  
-  if (!global.rateLimitStore) global.rateLimitStore = new Map();
-  
-  const entry = global.rateLimitStore.get(key) || { count: 0, resetAt: now + 60000 };
-  if (now > entry.resetAt) {
-    entry.count = 1;
-    entry.resetAt = now + 60000;
-  } else {
-    entry.count++;
-  }
-  
-  global.rateLimitStore.set(key, entry);
-  
-  if (entry.count > 10) {
-    return res.status(429).json({ error: 'rate_limit_exceeded', message: 'Too many requests. Try again later.' });
-  }
-  
-  next();
-}
-
-// GET /flows - list this user's flows (filtered by org_id for multi-tenancy)
+// GET /flows - list this user's flows (filtered by org_id)
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
-    
-    if (!userId || !orgId) {
-      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
-    }
-
+    // Get flows with their steps
     const flows = await select(
-      'sm_flows',
-      { user_id: userId, org_id: orgId },
+      TABLES.FLOWS,
+      { user_id: req.user.id, org_id: req.user.org_id },
       ['*'],
       { orderBy: 'created_at', orderDirection: 'DESC' }
     );
-
-    // Get steps for each flow
+    
+    // Get steps for all flows
     const flowIds = flows.map(f => f.id);
     let steps = [];
     if (flowIds.length > 0) {
       steps = await select(
-        'sm_flow_steps',
-        { flow_id: flowIds },
-        ['*']
+        TABLES.FLOW_STEPS,
+        { flow_id: flowIds },  // IN clause
+        ['*'],
+        { orderBy: 'order_index', orderDirection: 'ASC' }
       );
     }
-
-    // Combine flows with their steps
+    
+    // Attach steps to flows
     const flowsWithSteps = flows.map(flow => ({
       ...flow,
       sm_flow_steps: steps.filter(s => s.flow_id === flow.id)
     }));
-
+    
     res.json({ flows: flowsWithSteps });
   } catch (err) {
     next(err);
@@ -72,26 +47,21 @@ router.get('/', async (req, res, next) => {
 // POST /flows { name, triggerType, triggerConfig, steps: [{ module, action, connectionId, inputMap, condition }] }
 router.post('/', express.json(), async (req, res, next) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
-    
-    if (!userId || !orgId) {
-      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
-    }
-
     const { name, triggerType = 'manual', triggerConfig = {}, steps = [] } = req.body || {};
     if (!name || !Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json({ error: 'invalid_input', message: 'name and at least one step required' });
     }
 
-    const flow = await insert('sm_flows', { 
-      user_id: userId, 
-      org_id: orgId, 
+    // Insert flow with org_id
+    const flow = await insert(TABLES.FLOWS, { 
+      user_id: req.user.id, 
+      org_id: req.user.org_id,  // Multi-tenant scoping
       name, 
       trigger_type: triggerType, 
       trigger_config: triggerConfig 
     });
 
+    // Insert steps
     const stepRows = steps.map((s, i) => ({
       flow_id: flow.id,
       order_index: i,
@@ -103,7 +73,7 @@ router.post('/', express.json(), async (req, res, next) => {
     }));
 
     for (const step of stepRows) {
-      await insert('sm_flow_steps', step);
+      await insert(TABLES.FLOW_STEPS, step);
     }
 
     res.status(201).json({ flow });
@@ -116,21 +86,18 @@ router.post('/', express.json(), async (req, res, next) => {
 // POST /flows/:id/run - executes the flow's steps in order right now (manual trigger)
 router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    // Verify flow ownership with org_id
+    const flows = await select(TABLES.FLOWS, { 
+      id: req.params.id, 
+      user_id: req.user.id,
+      org_id: req.user.org_id 
+    }, ['id']);
     
-    if (!userId || !orgId) {
-      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
-    }
-
-    const flows = await select('sm_flows', { id: req.params.id, user_id: userId, org_id: orgId });
-    const flow = flows[0];
-    
-    if (!flow) {
+    if (!flows || flows.length === 0) {
       return res.status(404).json({ error: 'flow_not_found' });
     }
-
-    const result = await runFlow(flow.id, userId, orgId);
+    
+    const result = await runFlow(flows[0].id, req.user.id);
     res.json(result);
   } catch (err) {
     logger.error({ err }, '[flows] run failed');
@@ -141,20 +108,13 @@ router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
 // DELETE /flows/:id
 router.delete('/:id', async (req, res, next) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
-    
-    if (!userId || !orgId) {
-      return res.status(401).json({ error: 'unauthorized', message: 'You must be logged in' });
-    }
-
-    const deletedCount = await deleteRows('sm_flows', { 
+    const deleted = await del(TABLES.FLOWS, { 
       id: req.params.id, 
-      user_id: userId, 
-      org_id: orgId 
+      user_id: req.user.id,
+      org_id: req.user.org_id 
     });
     
-    if (deletedCount === 0) {
+    if (deleted === 0) {
       return res.status(404).json({ error: 'flow_not_found' });
     }
     
