@@ -1,13 +1,13 @@
 const express = require('express');
 const { getModule, listModules } = require('../modules');
 const { getConnection } = require('../lib/connections');
-const apiKeyAuth = require('../middleware/apiKeyAuth');
+const sessionAuth = require('../middleware/sessionAuth');
 const { actionRateLimiter } = require('../middleware/rateLimiter');
 const logger = require('../lib/logger');
 
 const router = express.Router();
 
-router.use(apiKeyAuth, actionRateLimiter);
+router.use(sessionAuth, actionRateLimiter);
 
 // GET /api - list available modules/actions (handy for building the UI dynamically)
 router.get('/', (req, res) => {
@@ -46,7 +46,7 @@ router.post('/:module/:action', async (req, res, next) => {
       return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
     }
 
-    const connection = await getConnection(connectionId, req.user.id);
+    const connection = await getConnection(connectionId, req.user.id, req.user.org_id);
 
     if (connection.provider !== mod.provider) {
       return res.status(400).json({
