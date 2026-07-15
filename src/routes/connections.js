@@ -11,16 +11,18 @@ router.use(sessionAuth);
 // Filtered by org_id for multi-tenancy
 router.get('/', async (req, res, next) => {
   try {
+    logger.info({ userId: req.user.id, orgId: req.user.org_id }, '[connections] Listing connections');
+    
     const connections = await select(
       TABLES.CONNECTIONS,
       { 
-        user_id: req.user.id,
         org_id: req.user.org_id  // Multi-tenant filter
       },
       ['id', 'provider', 'module', 'account_label', 'status', 'scopes', 'created_at'],
       { orderBy: 'created_at', orderDirection: 'DESC' }
     );
     
+    logger.info({ count: connections.length }, '[connections] Found connections');
     res.json({ connections });
   } catch (err) {
     logger.error({ err }, '[connections] list failed');
@@ -29,12 +31,11 @@ router.get('/', async (req, res, next) => {
 });
 
 // DELETE /connections/:id - revoke/remove a connection
-// Verify ownership by user_id AND org_id
+// Verify ownership by org_id only (user_id removed from schema)
 router.delete('/:id', async (req, res, next) => {
   try {
     const deleted = await del(TABLES.CONNECTIONS, {
       id: req.params.id,
-      user_id: req.user.id,
       org_id: req.user.org_id  // Multi-tenant verification
     });
     
@@ -42,6 +43,7 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Connection not found' });
     }
     
+    logger.info({ connectionId: req.params.id }, '[connections] Deleted connection');
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, '[connections] delete failed');

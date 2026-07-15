@@ -12,10 +12,10 @@ router.use(sessionAuth);
 // GET /flows - list this user's flows (filtered by org_id)
 router.get('/', async (req, res, next) => {
   try {
-    // Get flows with their steps
+    // Get flows with their steps - org_id only filter
     const flows = await select(
       TABLES.FLOWS,
-      { user_id: req.user.id, org_id: req.user.org_id },
+      { org_id: req.user.org_id },
       ['*'],
       { orderBy: 'created_at', orderDirection: 'DESC' }
     );
@@ -52,9 +52,8 @@ router.post('/', express.json(), async (req, res, next) => {
       return res.status(400).json({ error: 'invalid_input', message: 'name and at least one step required' });
     }
 
-    // Insert flow with org_id
+    // Insert flow with org_id only (user_id removed from schema)
     const flow = await insert(TABLES.FLOWS, { 
-      user_id: req.user.id, 
       org_id: req.user.org_id,  // Multi-tenant scoping
       name, 
       trigger_type: triggerType, 
@@ -86,10 +85,9 @@ router.post('/', express.json(), async (req, res, next) => {
 // POST /flows/:id/run - executes the flow's steps in order right now (manual trigger)
 router.post('/:id/run', actionRateLimiter, async (req, res, next) => {
   try {
-    // Verify flow ownership with org_id
+    // Verify flow ownership with org_id only
     const flows = await select(TABLES.FLOWS, { 
       id: req.params.id, 
-      user_id: req.user.id,
       org_id: req.user.org_id 
     }, ['id']);
     
@@ -110,7 +108,6 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const deleted = await del(TABLES.FLOWS, { 
       id: req.params.id, 
-      user_id: req.user.id,
       org_id: req.user.org_id 
     });
     

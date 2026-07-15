@@ -108,9 +108,8 @@ router.get('/google/callback', async (req, res) => {
     });
     const profile = userinfoRes.data;
 
-    // Insert connection with org_id for multi-tenancy
+    // Insert connection with org_id only (user_id removed from schema)
     await insert(TABLES.CONNECTIONS, {
-      user_id: entry.userId,
       org_id: entry.orgId,  // Multi-tenant scoping
       provider: 'google',
       module: entry.moduleName, // scopes this account to the module it was connected for
