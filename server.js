@@ -12,6 +12,8 @@ const path = require('path');
 const { pool, migrate, makeUniqueSlug } = require('./lib/db');
 const {
   createUser,
+  createOrganization,
+  getOrganizationById,
   createDefaultAdmin,
   authenticateUser,
   createSession,
@@ -89,7 +91,7 @@ app.post('/api/auth/login', async (req, res) => {
 // Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, password, role, orgName } = req.body;
     if (!fullName || !email || !password)
       return res.status(400).json({ error: 'Full name, email, and password are required' });
     if (password.length < 6)
@@ -97,7 +99,14 @@ app.post('/api/auth/signup', async (req, res) => {
     if (role && !['admin', 'team', 'client'].includes(role))
       return res.status(400).json({ error: 'Invalid role' });
 
-    const user = await createUser(email, password, fullName, role || 'team');
+    // Create organization if orgName provided (for new admin signup)
+    let orgId = null;
+    if (orgName && role === 'admin') {
+      const org = await createOrganization(orgName);
+      orgId = org.id;
+    }
+
+    const user = await createUser(email, password, fullName, role || 'team', orgId);
     const token = await createSession(user.id);
     res.cookie('session_token', token, {
       httpOnly: true,
@@ -105,7 +114,7 @@ app.post('/api/auth/signup', async (req, res) => {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.status(201).json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role, token });
+    res.status(201).json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role, orgId: user.org_id, token });
   } catch (err) {
     console.error('Signup error:', err);
     if (err.code === '23505' && err.constraint === 'users_email_key')
@@ -125,7 +134,13 @@ app.get('/api/auth/me', async (req, res) => {
       res.clearCookie('session_token');
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
-    res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+    // Get organization name for the user
+    let orgName = null;
+    if (user.orgId) {
+      const org = await getOrganizationById(user.orgId);
+      orgName = org ? org.name : null;
+    }
+    res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role, orgId: user.orgId, orgName });
   } catch (err) {
     console.error('Auth check error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -299,22 +314,27 @@ app.put('/api/profile/notifications', async (req, res) => {
 
 // ── Clients ────────────────────────────────────────────────────────────────────
 
-// GET all clients (scoped by role)
+// GET all clients (scoped by org and role)
 app.get('/api/clients', async (req, res) => {
   try {
     await migrate();
     let query, params = [];
-    if (req.user.role === 'admin') {
-      query = 'SELECT * FROM clients ORDER BY created_at DESC';
-    } else {
-      query = `
-        SELECT DISTINCT c.* FROM clients c
+    let i = 1;
+    
+    // Always filter by organization
+    query = 'SELECT * FROM clients WHERE org_id = $' + i++;
+    params.push(req.user.orgId);
+    
+    if (req.user.role !== 'admin') {
+      query += ` AND id IN (
+        SELECT DISTINCT c.id FROM clients c
         INNER JOIN work_items w ON w.client_id = c.id
-        WHERE w.assigned_to = $1
-        ORDER BY c.created_at DESC
-      `;
-      params = [req.user.id];
+        WHERE w.assigned_to = $${i++}
+      )`;
+      params.push(req.user.id);
     }
+    
+    query += ' ORDER BY created_at DESC';
     const { rows } = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -332,9 +352,9 @@ app.post('/api/clients', async (req, res) => {
 
     const slug = await makeUniqueSlug(name);
     const { rows } = await pool.query(
-      `INSERT INTO clients (name, email, phone, company, address, notes, slug, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, slug, req.user.id]
+      `INSERT INTO clients (name, email, phone, company, address, notes, slug, created_by, org_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, slug, req.user.id, req.user.orgId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -391,7 +411,7 @@ app.delete('/api/clients/:id', requireRole(['admin']), async (req, res) => {
 
 // ── Work Items ─────────────────────────────────────────────────────────────────
 
-// GET all work items (scoped by role)
+// GET all work items (scoped by org and role)
 app.get('/api/work-items', async (req, res) => {
   try {
     await migrate();
@@ -403,10 +423,10 @@ app.get('/api/work-items', async (req, res) => {
       FROM work_items w
       LEFT JOIN clients c ON c.id = w.client_id
       LEFT JOIN users u ON u.id = w.assigned_to
-      WHERE 1=1
+      WHERE w.org_id = $1
     `;
-    const params = [];
-    let i = 1;
+    const params = [req.user.orgId];
+    let i = 2;
 
     if (req.user.role !== 'admin') {
       query += ` AND w.assigned_to = $${i++}`;
@@ -434,10 +454,10 @@ app.post('/api/work-items', async (req, res) => {
     if (!client_id || !title) return res.status(400).json({ error: 'client_id and title are required' });
 
     const { rows } = await pool.query(
-      `INSERT INTO work_items (client_id,title,description,status,priority,due_date,amount,payment_status,assigned_to,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO work_items (client_id,title,description,status,priority,due_date,amount,payment_status,assigned_to,created_by,org_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [client_id, title.trim(), description||null, status||'pending', priority||'medium',
-       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.user.id]
+       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.user.id, req.user.orgId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {

@@ -273,7 +273,7 @@ function injectAuthModal() {
       </form>
       
       <!-- Signup Form -->
-      <form id="auth-form-signup" class="auth-form hidden" onsubmit="event.preventDefault(); signup(document.getElementById('signup-name').value, document.getElementById('signup-email').value, document.getElementById('signup-password').value, document.querySelector('input[name=\"signup-role\"]:checked')?.value || 'team')">
+      <form id="auth-form-signup" class="auth-form hidden" onsubmit="event.preventDefault(); signup(document.getElementById('signup-name').value, document.getElementById('signup-email').value, document.getElementById('signup-password').value, document.querySelector('input[name=\"signup-role\"]:checked')?.value || 'team', document.getElementById('signup-org-name').value)">
         <div class="input-group">
           <label for="signup-name">Full Name</label>
           <input id="signup-name" type="text" placeholder="John Doe" required />
@@ -289,16 +289,21 @@ function injectAuthModal() {
             <div class="password-strength-bar" id="password-strength-bar"></div>
           </div>
         </div>
+        <div class="input-group" id="org-name-group">
+          <label for="signup-org-name">Organization Name</label>
+          <input id="signup-org-name" type="text" placeholder="Your Company Name" required />
+          <span class="hint">This creates your organization workspace.</span>
+        </div>
         <div class="input-group">
           <label>Role</label>
           <div class="role-selector">
             <label class="role-option selected">
-              <input type="radio" name="signup-role" value="admin" checked />
+              <input type="radio" name="signup-role" value="admin" checked onchange="toggleOrgNameField()" />
               <span class="role-icon">👑</span>
               Admin
             </label>
             <label class="role-option">
-              <input type="radio" name="signup-role" value="team" />
+              <input type="radio" name="signup-role" value="team" onchange="toggleOrgNameField()" />
               <span class="role-icon">👤</span>
               Team
             </label>
