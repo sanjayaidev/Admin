@@ -1,5 +1,5 @@
 // Connections management page - session-based auth (no API key)
-const API = '';
+const API = '/api';
 
 let modulesCache = [];
 let connectionsCache = [];
@@ -27,7 +27,7 @@ async function init() {
 
 async function loadModules() {
   try {
-    const res = await fetch(API + '/api', { headers: headers() });
+    const res = await fetch(API + '/actions', { headers: headers() });
     const data = await res.json();
     modulesCache = res.ok ? (data.modules || []) : [];
   } catch (e) {
