@@ -1,4 +1,3 @@
-
 // public/js/auth.js
 // Frontend authentication logic
 let authToken = null;
@@ -150,7 +149,7 @@ async function login(email, password) {
 }
 
 // Signup function - supports creating org or joining existing org
-async function signup(fullName, email, password, orgId, orgSlug, orgName) {
+async function signup(fullName, email, password, orgId, orgSlug, orgName, mode) {
   const messageEl = document.getElementById('auth-message');
   const submitBtn = document.getElementById('auth-submit-btn-signup');
   
@@ -165,7 +164,7 @@ async function signup(fullName, email, password, orgId, orgSlug, orgName) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email, password, orgId, orgSlug, orgName })
+      body: JSON.stringify({ fullName, email, password, orgId, orgSlug, orgName, mode })
     });
     
     if (!res.ok) {
@@ -473,15 +472,16 @@ function handleSignup() {
   if (mode === 'create') {
     const orgName = document.getElementById('signup-org-name').value;
     const orgIdCreate = document.getElementById('signup-org-id-create').value.trim();
-    // For create mode: pass orgId (optional), and use null for orgSlug to indicate new org creation
-    // The org name will be sent separately or handled differently
-    signup(fullName, email, password, orgIdCreate || null, null, orgName);
+    // For create mode: pass orgId (optional custom ID for the NEW org), and use
+    // null for orgSlug. mode is sent explicitly so the server never has to
+    // guess "create" vs "join" just from whether orgId happens to be filled in.
+    signup(fullName, email, password, orgIdCreate || null, null, orgName, 'create');
   } else {
     const orgSlug = document.getElementById('signup-org-slug-join').value.trim();
     // Validate organization slug before proceeding
     validateOrganization().then(isValid => {
       if (isValid) {
-        signup(fullName, email, password, null, orgSlug, null);
+        signup(fullName, email, password, null, orgSlug, null, 'join');
       } else {
         const messageEl = document.getElementById('auth-message');
         messageEl.textContent = 'Please validate the organization slug before creating account';

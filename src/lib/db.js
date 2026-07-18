@@ -6,13 +6,8 @@ const { pool } = require('../../lib/db');
 
 // Table names, all prefixed with sm_ as decided.
 const TABLES = {
-  USERS: 'sm_users',
   ORGANIZATIONS: 'organizations',
-  API_KEYS: 'sm_api_keys',
   CONNECTIONS: 'sm_connections',
-  FLOWS: 'sm_flows',
-  FLOW_STEPS: 'sm_flow_steps',
-  FLOW_RUNS: 'sm_flow_runs',
 };
 
 /**

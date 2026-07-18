@@ -112,7 +112,7 @@ app.post('/api/auth/login', async (req, res) => {
 // Signup - Two paths: Create Org (Admin) or Join Org (Team, pending approval)
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { fullName, email, password, orgId, orgSlug, orgName } = req.body;
+    const { fullName, email, password, orgId, orgSlug, orgName, mode } = req.body;
     if (!fullName || !email || !password)
       return res.status(400).json({ error: 'Full name, email, and password are required' });
     if (password.length < 6)
@@ -125,8 +125,16 @@ app.post('/api/auth/signup', async (req, res) => {
 
     let user, org;
 
+    // Determine intent explicitly from `mode` (sent by the signup form) rather
+    // than inferring it from whether orgId/orgSlug happen to be filled in.
+    // Previously, filling in the *optional* "Organization ID" field on the
+    // "Create Organization" form was enough to make the server treat the
+    // signup as a "join existing org" request, silently creating the user as
+    // an inactive team member instead of an active admin.
+    const isJoin = mode === 'join' || (!mode && (orgSlug || (orgId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId))));
+
     // Path 1: Join existing organization (team member)
-    if (orgId || orgSlug) {
+    if (isJoin) {
       // Find the organization - always use orgSlug for lookup when joining
       // orgId should only be used if it's a valid UUID
       if (orgSlug) {
