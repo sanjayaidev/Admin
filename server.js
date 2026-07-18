@@ -164,7 +164,9 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     // Path 2: Create new organization (becomes admin immediately)
-    org = await createOrganization(fullName + "'s Organization");
+    // orgSlug contains the organization name, orgId is optional custom ID
+    const orgName = orgSlug || (fullName + "'s Organization");
+    org = await createOrganization(orgName, orgId);
     user = await createUser(email, password, fullName, 'admin', org.id, true);
 
     const token = await createSession(user.id);
@@ -227,6 +229,35 @@ app.post('/api/auth/logout', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Logout error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Validate organization ID (for join mode)
+app.get('/api/auth/validate-org', async (req, res) => {
+  try {
+    const orgId = req.query.id;
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization ID is required' });
+    }
+    
+    // Check if it's a UUID or slug format
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId);
+    
+    let org;
+    if (isUuid) {
+      org = await getOrganizationById(orgId);
+    } else {
+      org = await getOrganizationBySlug(orgId);
+    }
+    
+    if (org) {
+      res.json({ valid: true, orgId: org.id, orgName: org.name, slug: org.slug });
+    } else {
+      res.status(404).json({ valid: false, error: 'Organization not found' });
+    }
+  } catch (err) {
+    console.error('Validate org error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
