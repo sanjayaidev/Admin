@@ -1,1 +1,15 @@
-Nothing needs to be added to the .gitignore file based on the provided changes. The modification of 'server.js' does not introduce any new patterns that require ignoring.
+# Dependencies
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
