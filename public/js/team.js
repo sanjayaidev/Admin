@@ -5,6 +5,7 @@ let allMembers = [];
 let allRoles = [];
 let deleteTargetId = null;
 let isAdmin = false;
+
 // ─── Called by auth.js after auth check ───────────────────────────────────────
 
 async function loadTeamMembers() {
@@ -20,6 +21,8 @@ async function loadTeamMembers() {
     if (adminActions) {
       adminActions.style.display = 'flex';
     }
+    // Load pending join requests for admin
+    loadPendingJoinRequests();
   } else {
     const notice = document.getElementById('member-notice');
     if (notice) notice.style.display = 'block';
@@ -32,6 +35,66 @@ async function loadTeamMembers() {
 async function loadWorkloadData() {
   // Already called inside loadTeamMembers via fetchWorkload()
   // This stub prevents auth.js from erroring
+}
+
+// ─── Pending Join Requests (Admin only) ───────────────────────────────────────
+
+async function loadPendingJoinRequests() {
+  try {
+    const res = await fetch('/api/org/join-requests', { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch requests');
+    const requests = await res.json();
+    
+    const panel = document.getElementById('pending-requests-panel');
+    const list = document.getElementById('pending-requests-list');
+    
+    if (requests.length === 0) {
+      panel.classList.add('hidden');
+      return;
+    }
+    
+    panel.classList.remove('hidden');
+    list.innerHTML = requests.map(r => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+        <div>
+          <div style="font-weight:600; color:var(--gray-800);">${escapeHtml(r.user_name)}</div>
+          <div style="font-size:13px; color:var(--gray-500);">${escapeHtml(r.user_email)}</div>
+          <div style="font-size:12px; color:var(--gray-400); margin-top:4px;">Requested: ${new Date(r.requested_at).toLocaleDateString()}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn success-btn" onclick="decideJoinRequest(${r.id}, 'approved')">✓ Approve</button>
+          <button class="btn danger" onclick="decideJoinRequest(${r.id}, 'rejected')">✗ Reject</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load join requests:', err);
+  }
+}
+
+async function decideJoinRequest(requestId, status) {
+  if (!confirm(`${status === 'approved' ? 'Approve' : 'Reject'} this join request?`)) return;
+  
+  try {
+    const res = await fetch(`/api/org/join-requests/${requestId}/decide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Failed to process request');
+      return;
+    }
+    
+    // Reload requests and members
+    await loadPendingJoinRequests();
+    await fetchMembers();
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
 }
 
 // ─── Data fetching ─────────────────────────────────────────────────────────────
@@ -458,3 +521,5 @@ window.closeRolesModal = closeRolesModal;
 window.createRole = createRole;
 window.deleteRole = deleteRole;
 window.renderMembers = renderMembers;
+window.loadPendingJoinRequests = loadPendingJoinRequests;
+window.decideJoinRequest = decideJoinRequest;

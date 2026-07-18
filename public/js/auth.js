@@ -149,21 +149,23 @@ async function login(email, password) {
   }
 }
 
-// Signup function
-async function signup(fullName, email, password, role) {
+// Signup function - supports creating org or joining existing org
+async function signup(fullName, email, password, orgId, orgSlug) {
   const messageEl = document.getElementById('auth-message');
-  const submitBtn = document.getElementById('auth-submit-btn');
+  const submitBtn = document.getElementById('auth-submit-btn-signup');
   
   try {
     messageEl.classList.add('hidden');
-    submitBtn.disabled = true;
-    submitBtn.classList.add('loading');
-    submitBtn.textContent = 'Creating account...';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('loading');
+      submitBtn.textContent = 'Creating account...';
+    }
     
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email, password, role })
+      body: JSON.stringify({ fullName, email, password, orgId, orgSlug })
     });
     
     if (!res.ok) {
@@ -188,9 +190,11 @@ async function signup(fullName, email, password, role) {
     messageEl.className = 'auth-message error';
     messageEl.classList.remove('hidden');
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.classList.remove('loading');
-    submitBtn.textContent = 'Create Account';
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('loading');
+      submitBtn.textContent = 'Create Account';
+    }
   }
 }
 
@@ -279,7 +283,7 @@ function injectAuthModal() {
       </form>
       
       <!-- Signup Form -->
-      <form id="auth-form-signup" class="auth-form hidden" onsubmit="event.preventDefault(); signup(document.getElementById('signup-name').value, document.getElementById('signup-email').value, document.getElementById('signup-password').value, document.querySelector('input[name=\"signup-role\"]:checked')?.value || 'team', document.getElementById('signup-org-name').value)">
+      <form id="auth-form-signup" class="auth-form hidden" onsubmit="event.preventDefault(); handleSignup()">
         <div class="input-group">
           <label for="signup-name">Full Name</label>
           <input id="signup-name" type="text" placeholder="John Doe" required />
@@ -295,27 +299,39 @@ function injectAuthModal() {
             <div class="password-strength-bar" id="password-strength-bar"></div>
           </div>
         </div>
-        <div class="input-group" id="org-name-group">
-          <label for="signup-org-name">Organization Name</label>
-          <input id="signup-org-name" type="text" placeholder="Your Company Name" required />
-          <span class="hint">This creates your organization workspace.</span>
-        </div>
+        
+        <!-- Signup Mode Toggle -->
         <div class="input-group">
-          <label>Role</label>
+          <label>Signup Type</label>
           <div class="role-selector">
-            <label class="role-option selected">
-              <input type="radio" name="signup-role" value="admin" checked onchange="toggleOrgNameField()" />
-              <span class="role-icon">👑</span>
-              Admin
+            <label class="role-option selected" onclick="setSignupMode('create')">
+              <input type="radio" name="signup-mode" value="create" checked />
+              <span class="role-icon">🏢</span>
+              Create Organization
             </label>
-            <label class="role-option">
-              <input type="radio" name="signup-role" value="team" onchange="toggleOrgNameField()" />
-              <span class="role-icon">👤</span>
-              Team
+            <label class="role-option" onclick="setSignupMode('join')">
+              <input type="radio" name="signup-mode" value="join" />
+              <span class="role-icon">👥</span>
+              Join Existing Org
             </label>
           </div>
-          <span class="hint">Admin has full access. Team can manage clients and tasks.</span>
+          <span class="hint">Create your own org as admin, or join an existing team (pending approval).</span>
         </div>
+        
+        <!-- Create Org: Organization Name Field -->
+        <div class="input-group" id="org-name-group">
+          <label for="signup-org-name">Organization Name</label>
+          <input id="signup-org-name" type="text" placeholder="Your Company Name" />
+          <span class="hint">This creates your organization workspace. You'll be the admin.</span>
+        </div>
+        
+        <!-- Join Org: Org ID/Slug Field -->
+        <div class="input-group hidden" id="org-join-group">
+          <label for="signup-org-id">Organization ID or Slug</label>
+          <input id="signup-org-id" type="text" placeholder="e.g., graphicy or org-123" />
+          <span class="hint">Ask your admin for the org ID. Your account will need approval before access.</span>
+        </div>
+        
         <button id="auth-submit-btn-signup" type="submit" class="auth-submit-btn">Create Account</button>
       </form>
       
@@ -357,6 +373,44 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Set signup mode (create org or join org)
+function setSignupMode(mode) {
+  const createGroup = document.getElementById('org-name-group');
+  const joinGroup = document.getElementById('org-join-group');
+  const orgNameInput = document.getElementById('signup-org-name');
+  const orgIdInput = document.getElementById('signup-org-id');
+  
+  if (mode === 'create') {
+    createGroup.classList.remove('hidden');
+    joinGroup.classList.add('hidden');
+    orgNameInput.required = true;
+    orgIdInput.required = false;
+  } else {
+    createGroup.classList.add('hidden');
+    joinGroup.classList.remove('hidden');
+    orgNameInput.required = false;
+    orgIdInput.required = true;
+  }
+}
+
+// Handle signup form submission
+function handleSignup() {
+  const fullName = document.getElementById('signup-name').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const mode = document.querySelector('input[name="signup-mode"]:checked')?.value;
+  
+  if (mode === 'create') {
+    const orgName = document.getElementById('signup-org-name').value;
+    signup(fullName, email, password, null, orgName); // orgSlug passed as orgName for create
+  } else {
+    const orgId = document.getElementById('signup-org-id').value;
+    // Check if it looks like a UUID or a slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId);
+    signup(fullName, email, password, isUuid ? orgId : null, isUuid ? null : orgId);
+  }
+}
+
 // Make auth functions globally available
 window.login = login;
 window.signup = signup;
@@ -366,6 +420,8 @@ window.switchAuthTab = switchAuthTab;
 window.showAuthModal = showAuthModal;
 window.updateNavbar = updateNavbar;
 window.showAppContent = showAppContent;
+window.setSignupMode = setSignupMode;
+window.handleSignup = handleSignup;
 
 // Initialize auth check when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {

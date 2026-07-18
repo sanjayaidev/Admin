@@ -14,13 +14,18 @@ const {
   createUser,
   createOrganization,
   getOrganizationById,
+  getOrganizationBySlug,
   createDefaultAdmin,
   authenticateUser,
   createSession,
   validateSession,
   deleteSession,
   verifyPassword,
-  hashPassword
+  hashPassword,
+  createOrgJoinRequest,
+  getPendingJoinRequests,
+  updateJoinRequestStatus,
+  getUserPendingJoinRequest
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
 const {
@@ -104,25 +109,64 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Signup
+// Signup - Two paths: Create Org (Admin) or Join Org (Team, pending approval)
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { fullName, email, password, role, orgName } = req.body;
+    const { fullName, email, password, orgId, orgSlug } = req.body;
     if (!fullName || !email || !password)
       return res.status(400).json({ error: 'Full name, email, and password are required' });
     if (password.length < 6)
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    if (role && !['admin', 'team', 'client'].includes(role))
-      return res.status(400).json({ error: 'Invalid role' });
 
-    // Create organization if orgName provided (for new admin signup)
-    let orgId = null;
-    if (orgName && role === 'admin') {
-      const org = await createOrganization(orgName);
-      orgId = org.id;
+    // Check if user already exists
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0)
+      return res.status(400).json({ error: 'Email already registered' });
+
+    let user, org;
+
+    // Path 1: Join existing organization (team member)
+    if (orgId || orgSlug) {
+      // Find the organization
+      if (orgSlug) {
+        org = await getOrganizationBySlug(orgSlug);
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+      } else {
+        org = await getOrganizationById(orgId);
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      // Create user as inactive team member
+      user = await createUser(email, password, fullName, 'team', org.id, false);
+
+      // Create join request (pending approval)
+      const joinRequest = await createOrgJoinRequest(org.id, user.id, email, fullName);
+
+      const token = await createSession(user.id);
+      res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.status(201).json({
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role,
+        orgId: user.org_id,
+        orgName: org.name,
+        isActive: user.is_active,
+        pendingApproval: true,
+        token
+      });
     }
 
-    const user = await createUser(email, password, fullName, role || 'team', orgId);
+    // Path 2: Create new organization (becomes admin immediately)
+    org = await createOrganization(fullName + "'s Organization");
+    user = await createUser(email, password, fullName, 'admin', org.id, true);
+
     const token = await createSession(user.id);
     res.cookie('session_token', token, {
       httpOnly: true,
@@ -130,7 +174,18 @@ app.post('/api/auth/signup', async (req, res) => {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.status(201).json({ id: user.id, email: user.email, fullName: user.full_name, role: user.role, orgId: user.org_id, token });
+
+    res.status(201).json({
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role,
+      orgId: user.org_id,
+      orgName: org.name,
+      isActive: true,
+      isNewOrg: true,
+      token
+    });
   } catch (err) {
     console.error('Signup error:', err);
     if (err.code === '23505' && err.constraint === 'users_email_key')
@@ -936,6 +991,59 @@ app.put('/api/organization', requireRole(['admin']), async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error('Error updating organization:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// JOIN REQUESTS (Admin manages pending team member requests)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET pending join requests for current user's org (admin only)
+app.get('/api/org/join-requests', requireRole(['admin']), async (req, res) => {
+  try {
+    if (!req.user.orgId) return res.status(400).json({ error: 'User not in an organization' });
+    
+    const requests = await getPendingJoinRequests(req.user.orgId);
+    res.json(requests);
+  } catch (err) {
+    console.error('Error fetching join requests:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST approve/reject join request (admin only)
+app.post('/api/org/join-requests/:id/decide', requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'approved' or 'rejected'
+    
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be "approved" or "rejected"' });
+    }
+    
+    // Verify the request belongs to admin's org
+    const { rows } = await pool.query('SELECT org_id FROM org_join_requests WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+    if (rows[0].org_id !== req.user.orgId) {
+      return res.status(403).json({ error: 'Not authorized to manage this request' });
+    }
+    
+    const result = await updateJoinRequestStatus(id, status);
+    res.json(result);
+  } catch (err) {
+    console.error('Error processing join request:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET current user's pending join request status
+app.get('/api/org/my-join-request', requireAuth, async (req, res) => {
+  try {
+    const request = await getUserPendingJoinRequest(req.user.id);
+    res.json(request || null);
+  } catch (err) {
+    console.error('Error fetching join request:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
