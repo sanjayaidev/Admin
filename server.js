@@ -112,7 +112,7 @@ app.post('/api/auth/login', async (req, res) => {
 // Signup - Two paths: Create Org (Admin) or Join Org (Team, pending approval)
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { fullName, email, password, orgId, orgSlug } = req.body;
+    const { fullName, email, password, orgId, orgSlug, orgName } = req.body;
     if (!fullName || !email || !password)
       return res.status(400).json({ error: 'Full name, email, and password are required' });
     if (password.length < 6)
@@ -164,9 +164,9 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     // Path 2: Create new organization (becomes admin immediately)
-    // orgSlug contains the organization name, orgId is optional custom ID
-    const orgName = orgSlug || (fullName + "'s Organization");
-    org = await createOrganization(orgName, orgId);
+    // orgName contains the organization name, orgId is optional custom ID
+    const finalOrgName = orgName || (fullName + "'s Organization");
+    org = await createOrganization(finalOrgName, orgId);
     user = await createUser(email, password, fullName, 'admin', org.id, true);
 
     const token = await createSession(user.id);
