@@ -1160,6 +1160,10 @@ app.delete('/api/invoices/:id', requireRole(['admin']), async (req, res) => {
 
 app.use(express.static(PUBLIC_DIR));
 
+app.get('/invoices', (req, res) =>
+  res.sendFile(path.join(PUBLIC_DIR, 'invoices.html'))
+);
+
 app.get('/share/:slug', (req, res) =>
   res.sendFile(path.join(PUBLIC_DIR, 'share.html'))
 );
