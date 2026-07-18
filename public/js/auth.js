@@ -150,7 +150,7 @@ async function login(email, password) {
 }
 
 // Signup function - supports creating org or joining existing org
-async function signup(fullName, email, password, orgId, orgSlug) {
+async function signup(fullName, email, password, orgId, orgSlug, orgName) {
   const messageEl = document.getElementById('auth-message');
   const submitBtn = document.getElementById('auth-submit-btn-signup');
   
@@ -165,7 +165,7 @@ async function signup(fullName, email, password, orgId, orgSlug) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email, password, orgId, orgSlug })
+      body: JSON.stringify({ fullName, email, password, orgId, orgSlug, orgName })
     });
     
     if (!res.ok) {
@@ -473,7 +473,9 @@ function handleSignup() {
   if (mode === 'create') {
     const orgName = document.getElementById('signup-org-name').value;
     const orgIdCreate = document.getElementById('signup-org-id-create').value.trim();
-    signup(fullName, email, password, orgIdCreate || null, orgName); // orgId optional for create, orgSlug passed as orgName
+    // For create mode: pass orgId (optional), and use null for orgSlug to indicate new org creation
+    // The org name will be sent separately or handled differently
+    signup(fullName, email, password, orgIdCreate || null, null, orgName);
   } else {
     const orgId = document.getElementById('signup-org-id-join').value.trim();
     // Validate organization ID before proceeding
@@ -481,7 +483,7 @@ function handleSignup() {
       if (isValid) {
         // Check if it looks like a UUID or a regular ID
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId);
-        signup(fullName, email, password, isUuid ? orgId : null, isUuid ? null : orgId);
+        signup(fullName, email, password, isUuid ? orgId : null, isUuid ? null : orgId, null);
       } else {
         const messageEl = document.getElementById('auth-message');
         messageEl.textContent = 'Please validate the organization ID before creating account';
