@@ -96,7 +96,7 @@
 }
 
 .designer-controls select,
-.designer-controls input,
+.designer-controls input:not([type="checkbox"]):not([type="radio"]),
 .designer-controls textarea {
   width: 100%;
   padding: 10px 12px;
@@ -131,13 +131,36 @@
   font-size: 13px;
 }
 
+.billable-item input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
 .billable-item label {
   margin: 0;
   font-weight: 400;
   flex: 1;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
+  min-width: 0;
+}
+
+.billable-item label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.billable-item label strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .custom-items {
