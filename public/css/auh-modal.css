@@ -130,6 +130,10 @@
   gap: 4px;
 }
 
+.auth-form .input-group.hidden {
+  display: none !important;
+}
+
 .auth-form .input-group .hint {
   font-size: 12px;
   color: #94a3b8;
@@ -185,6 +189,19 @@
   pointer-events: none;
 }
 
+/* Outline Button */
+.auth-submit-btn.outline {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+}
+
+.auth-submit-btn.outline:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
 /* Error/Success Messages */
 .auth-message {
   padding: 10px 14px;
@@ -209,6 +226,11 @@
   display: none;
 }
 
+/* Utility */
+.hidden {
+  display: none !important;
+}
+
 /* Role Selector */
 .role-selector {
   display: grid;
@@ -226,6 +248,10 @@
   transition: all 0.2s;
   font-size: 13px;
   background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .role-option:hover {
@@ -235,6 +261,10 @@
 .role-option.selected {
   border-color: #3b82f6;
   background: #eff6ff;
+}
+
+.role-option:not(.selected) {
+  opacity: 0.7;
 }
 
 .role-option input[type="radio"] {
