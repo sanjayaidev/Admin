@@ -304,13 +304,13 @@ function injectAuthModal() {
         <div class="input-group">
           <label>Signup Type</label>
           <div class="role-selector">
-            <label class="role-option selected" onclick="setSignupMode('create')">
-              <input type="radio" name="signup-mode" value="create" checked />
+            <label class="role-option selected" id="mode-create-label">
+              <input type="radio" name="signup-mode" value="create" checked onchange="setSignupMode('create')" />
               <span class="role-icon">🏢</span>
               Create Organization
             </label>
-            <label class="role-option" onclick="setSignupMode('join')">
-              <input type="radio" name="signup-mode" value="join" />
+            <label class="role-option" id="mode-join-label">
+              <input type="radio" name="signup-mode" value="join" onchange="setSignupMode('join')" />
               <span class="role-icon">👥</span>
               Join Existing Org
             </label>
@@ -379,17 +379,23 @@ function setSignupMode(mode) {
   const joinGroup = document.getElementById('org-join-group');
   const orgNameInput = document.getElementById('signup-org-name');
   const orgIdInput = document.getElementById('signup-org-id');
+  const createLabel = document.getElementById('mode-create-label');
+  const joinLabel = document.getElementById('mode-join-label');
   
   if (mode === 'create') {
     createGroup.classList.remove('hidden');
     joinGroup.classList.add('hidden');
     orgNameInput.required = true;
     orgIdInput.required = false;
+    createLabel.classList.add('selected');
+    joinLabel.classList.remove('selected');
   } else {
     createGroup.classList.add('hidden');
     joinGroup.classList.remove('hidden');
     orgNameInput.required = false;
     orgIdInput.required = true;
+    createLabel.classList.remove('selected');
+    joinLabel.classList.add('selected');
   }
 }
 
