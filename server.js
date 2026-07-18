@@ -127,12 +127,21 @@ app.post('/api/auth/signup', async (req, res) => {
 
     // Path 1: Join existing organization (team member)
     if (orgId || orgSlug) {
-      // Find the organization
+      // Find the organization - always use orgSlug for lookup when joining
+      // orgId should only be used if it's a valid UUID
       if (orgSlug) {
         org = await getOrganizationBySlug(orgSlug);
         if (!org) return res.status(404).json({ error: 'Organization not found' });
-      } else {
-        org = await getOrganizationById(orgId);
+      } else if (orgId) {
+        // Only use orgId if it's provided and valid (UUID format)
+        // Validate UUID format before querying
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(orgId)) {
+          // If orgId is not a UUID, treat it as a slug
+          org = await getOrganizationBySlug(orgId);
+        } else {
+          org = await getOrganizationById(orgId);
+        }
         if (!org) return res.status(404).json({ error: 'Organization not found' });
       }
 
@@ -164,9 +173,23 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     // Path 2: Create new organization (becomes admin immediately)
-    // orgName contains the organization name, orgId is optional custom ID
+    // orgName contains the organization name, orgId is optional custom ID (must be valid UUID)
     const finalOrgName = orgName || (fullName + "'s Organization");
-    org = await createOrganization(finalOrgName, orgId);
+    
+    // Only pass orgId if it's explicitly provided and is a valid UUID
+    let newOrg;
+    if (orgId) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(orgId)) {
+        newOrg = await createOrganization(finalOrgName, orgId);
+      } else {
+        // If orgId is not a valid UUID, ignore it and auto-generate
+        newOrg = await createOrganization(finalOrgName);
+      }
+    } else {
+      newOrg = await createOrganization(finalOrgName);
+    }
+    org = newOrg;
     user = await createUser(email, password, fullName, 'admin', org.id, true);
 
     const token = await createSession(user.id);
@@ -209,11 +232,13 @@ app.get('/api/auth/me', async (req, res) => {
     }
     // Get organization name for the user
     let orgName = null;
+    let orgSlug = null;
     if (user.orgId) {
       const org = await getOrganizationById(user.orgId);
       orgName = org ? org.name : null;
+      orgSlug = org ? org.slug : null;
     }
-    res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role, orgId: user.orgId, orgName });
+    res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role, orgId: user.orgId, orgSlug, orgName });
   } catch (err) {
     console.error('Auth check error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -258,6 +283,27 @@ app.get('/api/auth/validate-org', async (req, res) => {
     }
   } catch (err) {
     console.error('Validate org error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Validate organization slug (for join mode using slug)
+app.get('/api/auth/validate-org-slug', async (req, res) => {
+  try {
+    const orgSlug = req.query.slug;
+    if (!orgSlug) {
+      return res.status(400).json({ error: 'Organization slug is required' });
+    }
+    
+    const org = await getOrganizationBySlug(orgSlug);
+    
+    if (org) {
+      res.json({ valid: true, orgId: org.id, orgName: org.name, slug: org.slug });
+    } else {
+      res.status(404).json({ valid: false, error: 'Organization not found' });
+    }
+  } catch (err) {
+    console.error('Validate org slug error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
