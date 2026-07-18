@@ -318,18 +318,25 @@ function injectAuthModal() {
           <span class="hint">Create your own org as admin, or join an existing team (pending approval).</span>
         </div>
         
-        <!-- Create Org: Organization Name Field -->
+        <!-- Create Org: Organization Name and ID Fields -->
         <div class="input-group" id="org-name-group">
           <label for="signup-org-name">Organization Name</label>
           <input id="signup-org-name" type="text" placeholder="Your Company Name" />
           <span class="hint">This creates your organization workspace. You'll be the admin.</span>
         </div>
+        <div class="input-group" id="org-id-group">
+          <label for="signup-org-id-create">Organization ID (Optional)</label>
+          <input id="signup-org-id-create" type="text" placeholder="e.g., org-123 or leave blank to auto-generate" />
+          <span class="hint">Optional: Provide a specific ID for your organization, or leave blank to auto-generate.</span>
+        </div>
         
-        <!-- Join Org: Org ID/Slug Field -->
+        <!-- Join Org: Org ID Field Only -->
         <div class="input-group hidden" id="org-join-group">
-          <label for="signup-org-id">Organization ID or Slug</label>
-          <input id="signup-org-id" type="text" placeholder="e.g., graphicy or org-123" />
+          <label for="signup-org-id-join">Organization ID</label>
+          <input id="signup-org-id-join" type="text" placeholder="e.g., org-123" />
           <span class="hint">Ask your admin for the org ID. Your account will need approval before access.</span>
+          <button type="button" id="validate-org-btn" class="btn outline" style="margin-top:8px; padding:4px 12px; font-size:12px;" onclick="validateOrganization()">Validate Organization ID</button>
+          <span id="org-validation-message" class="hint" style="display:block; margin-top:4px;"></span>
         </div>
         
         <button id="auth-submit-btn-signup" type="submit" class="auth-submit-btn">Create Account</button>
@@ -376,26 +383,83 @@ function escapeHtml(str) {
 // Set signup mode (create org or join org)
 function setSignupMode(mode) {
   const createGroup = document.getElementById('org-name-group');
+  const orgIdCreateGroup = document.getElementById('org-id-group');
   const joinGroup = document.getElementById('org-join-group');
   const orgNameInput = document.getElementById('signup-org-name');
-  const orgIdInput = document.getElementById('signup-org-id');
+  const orgIdCreateInput = document.getElementById('signup-org-id-create');
+  const orgIdJoinInput = document.getElementById('signup-org-id-join');
   const createLabel = document.getElementById('mode-create-label');
   const joinLabel = document.getElementById('mode-join-label');
+  const validationMessage = document.getElementById('org-validation-message');
+  
+  // Clear validation message when switching modes
+  if (validationMessage) {
+    validationMessage.textContent = '';
+    validationMessage.style.color = '';
+  }
   
   if (mode === 'create') {
     createGroup.classList.remove('hidden');
+    orgIdCreateGroup.classList.remove('hidden');
     joinGroup.classList.add('hidden');
     orgNameInput.required = true;
-    orgIdInput.required = false;
+    orgIdCreateInput.required = false;
+    orgIdJoinInput.required = false;
     createLabel.classList.add('selected');
     joinLabel.classList.remove('selected');
   } else {
     createGroup.classList.add('hidden');
+    orgIdCreateGroup.classList.add('hidden');
     joinGroup.classList.remove('hidden');
     orgNameInput.required = false;
-    orgIdInput.required = true;
+    orgIdCreateInput.required = false;
+    orgIdJoinInput.required = true;
     createLabel.classList.remove('selected');
     joinLabel.classList.add('selected');
+  }
+}
+
+// Validate organization ID before joining
+async function validateOrganization() {
+  const orgId = document.getElementById('signup-org-id-join').value.trim();
+  const validationMessage = document.getElementById('org-validation-message');
+  
+  if (!orgId) {
+    validationMessage.textContent = 'Please enter an organization ID';
+    validationMessage.style.color = '#ef4444';
+    return false;
+  }
+  
+  try {
+    validationMessage.textContent = 'Validating...';
+    validationMessage.style.color = '#64748b';
+    
+    const res = await fetch(`/api/auth/validate-org?id=${encodeURIComponent(orgId)}`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data.valid) {
+        validationMessage.textContent = `✓ Valid organization: ${data.orgName}`;
+        validationMessage.style.color = '#22c55e';
+        return true;
+      } else {
+        validationMessage.textContent = '✗ Organization not found';
+        validationMessage.style.color = '#ef4444';
+        return false;
+      }
+    } else {
+      const error = await res.json();
+      validationMessage.textContent = `✗ ${error.error || 'Organization not found'}`;
+      validationMessage.style.color = '#ef4444';
+      return false;
+    }
+  } catch (error) {
+    validationMessage.textContent = '✗ Error validating organization';
+    validationMessage.style.color = '#ef4444';
+    return false;
   }
 }
 
@@ -408,12 +472,23 @@ function handleSignup() {
   
   if (mode === 'create') {
     const orgName = document.getElementById('signup-org-name').value;
-    signup(fullName, email, password, null, orgName); // orgSlug passed as orgName for create
+    const orgIdCreate = document.getElementById('signup-org-id-create').value.trim();
+    signup(fullName, email, password, orgIdCreate || null, orgName); // orgId optional for create, orgSlug passed as orgName
   } else {
-    const orgId = document.getElementById('signup-org-id').value;
-    // Check if it looks like a UUID or a slug
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId);
-    signup(fullName, email, password, isUuid ? orgId : null, isUuid ? null : orgId);
+    const orgId = document.getElementById('signup-org-id-join').value.trim();
+    // Validate organization ID before proceeding
+    validateOrganization().then(isValid => {
+      if (isValid) {
+        // Check if it looks like a UUID or a regular ID
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId);
+        signup(fullName, email, password, isUuid ? orgId : null, isUuid ? null : orgId);
+      } else {
+        const messageEl = document.getElementById('auth-message');
+        messageEl.textContent = 'Please validate the organization ID before creating account';
+        messageEl.className = 'auth-message error';
+        messageEl.classList.remove('hidden');
+      }
+    });
   }
 }
 
@@ -428,6 +503,7 @@ window.updateNavbar = updateNavbar;
 window.showAppContent = showAppContent;
 window.setSignupMode = setSignupMode;
 window.handleSignup = handleSignup;
+window.validateOrganization = validateOrganization;
 
 // Initialize auth check when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
