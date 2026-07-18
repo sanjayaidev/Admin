@@ -1,6 +1,7 @@
 -- =====================================================
 -- Multi-Tenancy Update SQL Migration
 -- For ClientPM with Google APIs Flow Builder Integration
+-- Uses org_id (UUID) for relationships and org_slug for tenant lookup
 -- =====================================================
 
 -- 1. Create organizations table if not exists
@@ -14,13 +15,21 @@ CREATE TABLE IF NOT EXISTS organizations (
 
 CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
 
--- 2. Add org_id to users table if not exists
+-- 2. Add org_id to users table if not exists (for tenant isolation)
 DO $$ BEGIN
   ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
+
+-- Add org_slug column to users for easy lookup (denormalized for performance)
+DO $$ BEGIN
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS org_slug VARCHAR(100);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_users_org_slug ON users(org_slug);
 
 -- 3. Add org_id to clients table if not exists  
 DO $$ BEGIN
@@ -117,6 +126,23 @@ CREATE TRIGGER trg_update_org_updated_at
   BEFORE UPDATE ON organizations
   FOR EACH ROW
   EXECUTE FUNCTION update_org_updated_at();
+
+-- 14. Trigger to auto-set org_slug when org_id is set on users
+CREATE OR REPLACE FUNCTION set_user_org_slug()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.org_id IS NOT NULL THEN
+    SELECT slug INTO NEW.org_slug FROM organizations WHERE id = NEW.org_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_user_org_slug ON users;
+CREATE TRIGGER trg_set_user_org_slug
+  BEFORE INSERT OR UPDATE OF org_id ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION set_user_org_slug();
 
 -- =====================================================
 -- MIGRATION EXAMPLE: Create organization for existing user
