@@ -23,6 +23,14 @@ const {
   hashPassword
 } = require('./lib/auth');
 const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
+const {
+  createInvoiceFromTasks,
+  updateInvoiceDraft,
+  calculateTotals,
+  getInvoiceDetails,
+  generateInvoiceHTML,
+  markInvoicePaid
+} = require('./lib/payment/invoice');
 
 // ── Google Modules Integration (Flow Builder) ─────────────────────────────────
 // Mount the modules API routes for Gmail, Calendar, Sheets, Docs, Drive, Forms, GBP
@@ -928,6 +936,220 @@ app.put('/api/organization', requireRole(['admin']), async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error('Error updating organization:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INVOICES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET all invoices (scoped by org)
+app.get('/api/invoices', async (req, res) => {
+  try {
+    await migrate();
+    const { status, client_id } = req.query;
+
+    let query = `
+      SELECT i.*, c.name AS client_name, c.company AS client_company
+      FROM invoices i
+      LEFT JOIN clients c ON c.id = i.client_id
+      WHERE i.org_id = $1
+    `;
+    const params = [req.user.orgId];
+    let idx = 2;
+
+    if (status)    { query += ` AND i.status = $${idx++}`;    params.push(status); }
+    if (client_id) { query += ` AND i.client_id = $${idx++}`; params.push(client_id); }
+
+    query += ' ORDER BY i.created_at DESC';
+
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching invoices:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET billable work items for a client — used by the invoice designer to show what can be billed
+app.get('/api/invoices/billable-items/:clientId', async (req, res) => {
+  try {
+    await migrate();
+    const { rows } = await pool.query(
+      `SELECT * FROM work_items
+       WHERE client_id = $1 AND org_id = $2 AND (payment_status IS NULL OR payment_status = 'unpaid')
+       ORDER BY created_at DESC`,
+      [req.params.clientId, req.user.orgId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching billable items:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST live preview — calculates totals and renders invoice HTML WITHOUT saving anything.
+// This is what powers the "design it before you commit" experience.
+app.post('/api/invoices/preview', async (req, res) => {
+  try {
+    await migrate();
+    const { clientId, workItemIds = [], customItems = [], taxRate, notes, issueDate, dueDate } = req.body;
+
+    const clientRes = await pool.query('SELECT * FROM clients WHERE id = $1 AND org_id = $2', [clientId, req.user.orgId]);
+    if (clientRes.rows.length === 0) return res.status(404).json({ error: 'Client not found' });
+    const client = clientRes.rows[0];
+
+    let workItems = [];
+    if (workItemIds.length > 0) {
+      const placeholders = workItemIds.map((_, i) => `$${i + 1}`).join(',');
+      const wiRes = await pool.query(`SELECT * FROM work_items WHERE id IN (${placeholders})`, workItemIds);
+      workItems = wiRes.rows;
+    }
+
+    const { subtotal, tax, total, taxRate: rate } = calculateTotals(workItems, customItems, taxRate);
+
+    const previewInvoice = {
+      invoice_number: 'DRAFT-PREVIEW',
+      status: 'draft',
+      issue_date: issueDate || new Date().toISOString().split('T')[0],
+      due_date: dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      client_name: client.name,
+      company: client.company,
+      address: client.address,
+      client_email: client.email,
+      subtotal, tax, total, tax_rate: rate,
+      notes: notes || '',
+      work_items: workItems,
+      custom_items: customItems
+    };
+
+    res.json({ invoice: previewInvoice, html: generateInvoiceHTML(previewInvoice) });
+  } catch (err) {
+    console.error('Error generating invoice preview:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST create invoice (always starts as draft — sending is a separate, deliberate step)
+app.post('/api/invoices', async (req, res) => {
+  try {
+    await migrate();
+    const { clientId, workItemIds = [], customItems = [], taxRate, notes, issueDate, dueDate } = req.body;
+    if (!clientId) return res.status(400).json({ error: 'Client is required' });
+
+    const clientRes = await pool.query('SELECT id FROM clients WHERE id = $1 AND org_id = $2', [clientId, req.user.orgId]);
+    if (clientRes.rows.length === 0) return res.status(404).json({ error: 'Client not found' });
+
+    const invoice = await createInvoiceFromTasks(clientId, workItemIds, req.user.id, {
+      customItems, taxRate, notes, issueDate, dueDate,
+      orgId: req.user.orgId,
+      status: 'draft'
+    });
+    res.status(201).json(invoice);
+  } catch (err) {
+    console.error('Error creating invoice:', err);
+    res.status(400).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// GET single invoice with full details
+app.get('/api/invoices/:id', async (req, res) => {
+  try {
+    await migrate();
+    const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
+
+    const invoice = await getInvoiceDetails(req.params.id);
+    res.json(invoice);
+  } catch (err) {
+    console.error('Error fetching invoice:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET rendered invoice HTML (for preview / printing a saved invoice)
+app.get('/api/invoices/:id/html', async (req, res) => {
+  try {
+    await migrate();
+    const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
+
+    const invoice = await getInvoiceDetails(req.params.id);
+    res.send(generateInvoiceHTML(invoice));
+  } catch (err) {
+    console.error('Error rendering invoice:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT update a draft invoice (line items, dates, notes, tax rate) — recalculates totals
+app.put('/api/invoices/:id', async (req, res) => {
+  try {
+    await migrate();
+    const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
+
+    const { workItemIds, customItems, taxRate, notes, issueDate, dueDate } = req.body;
+    const invoice = await updateInvoiceDraft(req.params.id, req.user.id, {
+      workItemIds, customItems, taxRate, notes, issueDate, dueDate
+    });
+    res.json(invoice);
+  } catch (err) {
+    console.error('Error updating invoice:', err);
+    res.status(400).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// POST send invoice — locks it from further editing and marks linked work items as partially paid
+app.post('/api/invoices/:id/send', async (req, res) => {
+  try {
+    await migrate();
+    const check = await pool.query('SELECT * FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
+
+    const { rows } = await pool.query(
+      `UPDATE invoices SET status = 'sent', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    const workItemIds = rows[0].work_item_ids || [];
+    if (workItemIds.length > 0) {
+      await pool.query(`UPDATE work_items SET payment_status = 'partial' WHERE id = ANY($1)`, [workItemIds]);
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error sending invoice:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST mark invoice paid
+app.post('/api/invoices/:id/pay', async (req, res) => {
+  try {
+    await migrate();
+    const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
+
+    const invoice = await markInvoicePaid(req.params.id, req.body.paymentId || null);
+    res.json(invoice);
+  } catch (err) {
+    console.error('Error marking invoice paid:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE invoice (draft only — sent/paid invoices are kept for records; admin only)
+app.delete('/api/invoices/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const { rows } = await pool.query(
+      `DELETE FROM invoices WHERE id = $1 AND org_id = $2 AND status = 'draft' RETURNING id`,
+      [req.params.id, req.user.orgId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Draft invoice not found (only unsent drafts can be deleted)' });
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Error deleting invoice:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

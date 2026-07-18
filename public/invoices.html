@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoices · ClientPM</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/invoices.css" />
+  <link rel="stylesheet" href="/css/auh-modal.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <span class="brand">ClientPM</span>
+    <a href="/">Dashboard</a>
+    <a href="/clients.html">Clients</a>
+    <a href="/tasks.html">Tasks</a>
+    <a href="/invoices.html" class="active">Invoices</a>
+    <a href="/calendar.html">Calendar</a>
+    <a href="/team.html">Team</a>
+    <a href="/settings.html">Settings</a>
+    <a href="/profile.html">Profile</a>
+  </nav>
+
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1>🧾 Invoices</h1>
+        <p id="invoice-count">Loading...</p>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <select id="status-filter" onchange="loadInvoices()">
+          <option value="">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <button class="btn" onclick="openDesigner()">➕ New Invoice</button>
+      </div>
+    </div>
+
+    <div id="invoices-list" class="invoices-list"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       INVOICE DESIGNER — pick a client, choose what to bill, tweak the
+       numbers, and see exactly what the client will receive before you
+       commit to anything. Nothing is saved until "Save as Draft".
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="designer-modal">
+    <div class="modal-box designer-box">
+      <div class="designer-header">
+        <h3>🎨 Design Invoice</h3>
+        <button class="btn icon" onclick="closeDesigner()">✕</button>
+      </div>
+
+      <div class="designer-layout">
+        <!-- LEFT: controls -->
+        <div class="designer-controls">
+          <label>Client *</label>
+          <select id="d-client" onchange="onClientChange()">
+            <option value="">Select a client…</option>
+          </select>
+
+          <div id="d-billable-section" style="display:none;">
+            <label>Unbilled work items</label>
+            <div id="d-billable-items" class="billable-items"></div>
+          </div>
+
+          <label>Custom line items</label>
+          <div id="d-custom-items" class="custom-items"></div>
+          <button class="btn outline small" onclick="addCustomItem()">➕ Add line item</button>
+
+          <div class="field-row">
+            <div>
+              <label>Issue date</label>
+              <input type="date" id="d-issue-date" />
+            </div>
+            <div>
+              <label>Due date</label>
+              <input type="date" id="d-due-date" />
+            </div>
+          </div>
+
+          <label>Tax rate (%)</label>
+          <input type="number" id="d-tax-rate" value="18" min="0" max="100" step="0.5" />
+
+          <label>Notes (shown on invoice)</label>
+          <textarea id="d-notes" rows="3" placeholder="Payment terms, thank-you note, etc."></textarea>
+
+          <div id="d-error" class="designer-error" style="display:none;"></div>
+        </div>
+
+        <!-- RIGHT: live preview -->
+        <div class="designer-preview">
+          <div class="preview-label">Live preview — this is what your client will see</div>
+          <iframe id="d-preview-frame" class="preview-frame"></iframe>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn outline" onclick="closeDesigner()">Cancel</button>
+        <button class="btn" id="d-save-btn" onclick="saveDraft()">💾 Save as Draft</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View / send / pay modal for an existing invoice -->
+  <div class="modal-overlay" id="view-modal">
+    <div class="modal-box designer-box">
+      <div class="designer-header">
+        <h3 id="view-title">Invoice</h3>
+        <button class="btn icon" onclick="closeView()">✕</button>
+      </div>
+      <iframe id="view-frame" class="preview-frame full"></iframe>
+      <div class="modal-actions" id="view-actions"></div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/invoices.js"></script>
+</body>
+</html>
