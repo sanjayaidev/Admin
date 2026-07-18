@@ -184,6 +184,19 @@ app.post('/api/auth/signup', async (req, res) => {
     // orgName contains the organization name, orgId is optional custom ID (must be valid UUID)
     const finalOrgName = orgName || (fullName + "'s Organization");
     
+    // Generate the slug that would be used for this organization
+    const generatedSlug = finalOrgName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'org';
+    
+    // Check if the slug is already taken before attempting to create the organization
+    const existingOrg = await getOrganizationBySlug(generatedSlug);
+    if (existingOrg) {
+      return res.status(400).json({ 
+        error: 'Organization name is already taken',
+        detail: `An organization with a similar name already exists. Please choose a different organization name or try adding numbers or modifiers (e.g., "${finalOrgName} Inc", "${finalOrgName} LLC").`,
+        suggestedNames: [`${finalOrgName} Inc`, `${finalOrgName} LLC`, `${finalOrgName} Co`, `${finalOrgName} ${Math.floor(Math.random() * 100)}`]
+      });
+    }
+    
     // Only pass orgId if it's explicitly provided and is a valid UUID
     let newOrg;
     if (orgId) {

@@ -169,6 +169,38 @@ async function signup(fullName, email, password, orgId, orgSlug, orgName, mode) 
     
     if (!res.ok) {
       const error = await res.json();
+      
+      // Handle organization slug already taken error with detailed message
+      if (error.error === 'Organization name is already taken') {
+        let errorMsg = `<strong>${error.error}</strong><br/>${error.detail || ''}`;
+        
+        // Show suggested alternative names if available
+        if (error.suggestedNames && error.suggestedNames.length > 0) {
+          errorMsg += `<br/><br/><strong>Try these instead:</strong><br/>`;
+          error.suggestedNames.slice(0, 3).forEach(name => {
+            errorMsg += `• ${escapeHtml(name)}<br/>`;
+          });
+        }
+        
+        messageEl.innerHTML = errorMsg;
+        messageEl.className = 'auth-message error';
+        messageEl.classList.remove('hidden');
+        
+        // Highlight the org name input field
+        const orgNameInput = document.getElementById('signup-org-name');
+        if (orgNameInput) {
+          orgNameInput.style.borderColor = '#ef4444';
+          orgNameInput.focus();
+        }
+        
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('loading');
+          submitBtn.textContent = 'Create Account';
+        }
+        return;
+      }
+      
       throw new Error(error.error || 'Signup failed');
     }
     
