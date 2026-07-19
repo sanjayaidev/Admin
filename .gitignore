@@ -1,1 +1,30 @@
-Nothing to output - the changes only include a source/config file (README.md) with no build artifacts, dependencies, or temp files.
+```
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.pyc
+__pycache__/
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Package lock
+package-lock.json
+.yarn-integrity
+```
