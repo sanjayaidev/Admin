@@ -1,23 +1,35 @@
 # ClientPM - Client Project Management Platform
 
-A full-stack client project management platform with Google ecosystem integration, team management, invoicing, and notification systems.
+A full-stack client project management platform with Google ecosystem integration, visual flow builder for automation, team management, invoicing, and notification systems.
 
 ## 🚀 Features
 
 ### Core Features
+- **Multi-Tenancy**: Organization-based isolation with organization slugs and user scoping
 - **Authentication & Authorization**: HTTP-only cookie-based sessions with role-based access control (Admin, Team, Client)
 - **Client Management**: Full CRUD operations for client records with unique slugs
 - **Task/Work Item Management**: Track work items with status, priority, due dates, and payment tracking
 - **Calendar Integration**: Event management with Google Calendar two-way sync
 - **Team Management**: Add, edit, deactivate team members with workload distribution view
 - **User Profiles**: Personal information, avatar upload, password change, activity history
+- **Share Links**: Generate shareable links for clients to view their projects
 
-### Google Integrations
-- **Google Calendar**: Two-way event sync, automatic Meet link generation
-- **Google Drive**: Client folder creation, file upload/share
-- **Google Sheets**: Data export/import, report generation
-- **Google Meet**: Automatic meeting link creation
-- **Gmail**: Email sending via Apps Script (stub)
+### Visual Flow Builder (Automation)
+- **Drag-and-Drop Interface**: Visual canvas for building automation workflows
+- **Triggers**: Polling-based and webhook-based triggers
+- **Multi-Step Workflows**: Chain multiple actions with conditional logic
+- **Connection Management**: OAuth-based connections per organization
+- **Real-Time Execution**: Execute flows instantly or on schedule
+
+### Google Integrations (via Flow Builder)
+- **Gmail**: Send emails, list messages, manage labels
+- **Google Calendar**: Create/list/update events, manage calendars
+- **Google Sheets**: Read/write spreadsheets, append rows, query data
+- **Google Docs**: Create documents, append text, replace content
+- **Google Drive**: Upload/download files, create folders, share files
+- **Google Forms**: Create forms, add questions, list responses
+- **Google Business Profile**: Manage locations, reviews, posts, metrics
+- **Google Meet**: Automatic meeting link generation
 
 ### Invoice System
 - Auto-generated invoice numbers (INV-YYYY-XXXX format)
@@ -27,8 +39,8 @@ A full-stack client project management platform with Google ecosystem integratio
 - Razorpay payment gateway integration (ready)
 
 ### Notification System
-- **Email Notifications**: Via Nodemailer
-- **WhatsApp Notifications**: Via GOWA API (stub)
+- **Email Notifications**: Via Nodemailer with SMTP support
+- **WhatsApp Notifications**: Via GOWA API
 - **Scheduled Reminders**:
   - Daily overdue task reminders (8:00 AM)
   - Upcoming task notifications (24 hours before)
@@ -46,13 +58,17 @@ A full-stack client project management platform with Google ecosystem integratio
 clientpm/
 ├── server.js                    # Main Express server with all routes
 ├── package.json                 # Dependencies
-├── .env.example                 # Environment variables template
+├── .env                         # Environment variables (create from template below)
 ├── README.md                    # This file
+├── ADMIN_SETUP.md               # Admin user setup guide
+├── INTEGRATION_SUMMARY.md       # Google APIs integration details
+├── multitenancy-update.sql      # Multi-tenancy database migration
 ├── lib/
 │   ├── db.js                   # Database connection & migrations
 │   ├── auth.js                 # Authentication logic
 │   ├── redis.js                # Redis client setup
 │   ├── cron.js                 # Cron job scheduler
+│   ├── shareLinks.js           # Shareable link generation
 │   ├── google/
 │   │   ├── auth.js             # Google OAuth 2.0
 │   │   ├── calendar.js         # Calendar operations
@@ -61,13 +77,38 @@ clientpm/
 │   │   ├── sheets.js           # Sheets operations
 │   │   └── gmail.js            # Gmail (Apps Script stub)
 │   ├── payment/
-│   │   ├── gateway.js          # Razorpay integration
 │   │   └── invoice.js          # Invoice generation
-│   ├── notifications/
-│   │   ├── scheduler.js        # Notification scheduler
-│   │   └── templates.js        # Email/WhatsApp templates
 │   └── whatsapp/
 │       └── gowa.js             # GOWA API stub
+├── src/                         # Flow Builder modules (deployed separately)
+│   ├── config/
+│   │   └── env.js              # Environment configuration
+│   ├── lib/
+│   │   ├── connections.js      # Connection helpers
+│   │   ├── encryption.js       # Token encryption
+│   │   ├── keepAlive.js        # Keep-alive pings
+│   │   └── logger.js           # Logging utility
+│   ├── middleware/
+│   │   ├── apiKeyAuth.js       # API key authentication
+│   │   ├── errorHandler.js     # Global error handler
+│   │   ├── rateLimiter.js      # Rate limiting
+│   │   └── sessionAuth.js      # Session authentication
+│   ├── modules/
+│   │   ├── index.js            # Module registry
+│   │   ├── gmail.js            # Gmail module
+│   │   ├── calendar.js         # Calendar module
+│   │   ├── sheets.js           # Sheets module
+│   │   ├── docs.js             # Docs module
+│   │   ├── drive.js            # Drive module
+│   │   ├── forms.js            # Forms module
+│   │   └── googleBusinessProfile.js  # Business Profile module
+│   └── routes/
+│       ├── oauth.js            # OAuth 2.0 flow handling
+│       ├── connections.js      # Connection management
+│       ├── actionRouter.js     # Action execution router
+│       ├── webhooks.js         # Webhook receivers
+│       ├── health.js           # Health check endpoint
+│       └── auth.js             # Auth routes
 ├── middleware/
 │   ├── auth.js                 # Auth & role middleware
 │   └── logger.js               # Request/response logging
@@ -76,21 +117,33 @@ clientpm/
 │   ├── clients.html            # Client management
 │   ├── tasks.html              # Task management
 │   ├── calendar.html           # Calendar view
-│   ├── settings.html           # Integrations & settings
+│   ├── settings.html           # Settings page
 │   ├── profile.html            # User profile
 │   ├── team.html               # Team management
 │   ├── invoices.html           # Invoice management
+│   ├── connections.html        # OAuth connections manager
+│   ├── share.html              # Client share portal
 │   ├── css/
 │   │   ├── style.css           # Global styles
 │   │   ├── settings.css        # Settings page styles
 │   │   ├── profile.css         # Profile page styles
-│   │   └── team.css            # Team page styles
+│   │   ├── team.css            # Team page styles
+│   │   └── auh-modal.css       # Auth modal styles
 │   └── js/
+│       ├── app.js              # Main application logic
 │       ├── auth.js             # Frontend auth logic
 │       ├── utils.js            # Shared utilities
+│       ├── dashboard.js        # Dashboard logic
+│       ├── clients.js          # Client management
+│       ├── tasks.js            # Task management
+│       ├── calendar.js         # Calendar logic
+│       ├── invoices.js         # Invoice management
 │       ├── settings.js         # Settings page logic
 │       ├── profile.js          # Profile management
-│       └── team.js             # Team management
+│       ├── team.js             # Team management
+│       ├── connections.js      # Connections manager
+│       ├── share.js            # Share link logic
+│       └── nodeDefs.js         # Flow builder node definitions
 └── views/
     └── invoice-template.html   # HTML invoice template
 ```
@@ -121,7 +174,7 @@ npm install
 
 ### 2. Environment Setup
 
-Copy `.env.example` to `.env` and configure:
+Create a `.env` file in the root directory with the following configuration:
 
 ```env
 # Database
@@ -157,6 +210,8 @@ APP_URL=http://localhost:3000
 NODE_ENV=development
 PORT=3000
 ```
+
+**Note:** The Flow Builder (`src/` directory) is deployed separately at https://googleapis-r8qg.onrender.com and has its own environment configuration.
 
 ### 3. Database Setup
 
@@ -298,6 +353,12 @@ Stack Trace: ...
 - Notification preferences
 - Invoice settings
 - System configuration
+- **Link to Flow Builder** for advanced automation workflows
+
+### Connections Manager (`/connections.html`)
+- View and manage all OAuth connections
+- Connect/disconnect Google services
+- Connection status monitoring
 
 ### Profile (`/profile.html`)
 - Personal information editing
@@ -345,6 +406,22 @@ npm test
 
 # Development mode with auto-restart
 npm run dev
+```
+
+## 🔍 API Health Check
+
+The application provides a health check endpoint at `/api/health`:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
 ```
 
 ## 📝 TODO / Future Enhancements
