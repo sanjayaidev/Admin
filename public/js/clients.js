@@ -57,7 +57,7 @@ function clientCardHtml(client) {
         ${client.address ? `<div class="client-info-item">📍 ${escapeHtml(client.address)}</div>` : ''}
       </div>
       <div class="client-card-actions">
-        <a href="/share/${escapeHtml(client.slug)}" target="_blank" class="btn small outline">🔗 Portal</a>
+        <button class="btn small outline" onclick="openShareModal(${client.id})">🔗 Share Dashboard</button>
         <button class="btn small outline" onclick="editClient(${client.id})">✏️ Edit</button>
         <button class="btn small danger" onclick="openDeleteModal(${client.id})">🗑️ Delete</button>
       </div>
@@ -185,6 +185,106 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+// ─── Share Dashboard modal ──────────────────────────────────────────────────
+
+let shareClientId = null;
+
+async function openShareModal(clientId) {
+  shareClientId = clientId;
+  const client = allClients.find(c => c.id == clientId);
+  document.getElementById('share-client-name').textContent = client ? client.name : '';
+  document.getElementById('share-label').value = '';
+  document.getElementById('share-expires').value = '';
+  document.getElementById('share-modal').classList.add('open');
+  await loadShareLinks();
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('open');
+  shareClientId = null;
+}
+
+async function loadShareLinks() {
+  const container = document.getElementById('share-links-list');
+  container.innerHTML = 'Loading…';
+  try {
+    const res = await fetch(`/api/clients/${shareClientId}/share-links`);
+    if (!res.ok) throw new Error('Failed to load share links');
+    const links = await res.json();
+
+    if (links.length === 0) {
+      container.innerHTML = '<p style="font-size:13px; color:#9ca3af;">No share links yet. Generate one below.</p>';
+      return;
+    }
+
+    container.innerHTML = links.map(link => {
+      const revoked = !!link.revoked_at;
+      const expired = link.expires_at && new Date(link.expires_at) < new Date();
+      const inactive = revoked || expired;
+      return `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--gray-200,#e5e7eb);">
+          <div style="font-size:13px;">
+            <div><strong>${escapeHtml(link.label || 'Untitled link')}</strong>
+              <span class="badge ${inactive ? 'unpaid' : 'paid'}" style="font-size:10px;">
+                ${revoked ? 'Revoked' : expired ? 'Expired' : 'Active'}
+              </span>
+            </div>
+            <div style="color:#9ca3af;">
+              Token ${escapeHtml(link.token_prefix)}… · Created ${formatDate(link.created_at)}
+              ${link.expires_at ? ` · Expires ${formatDate(link.expires_at)}` : ''}
+              ${link.access_count ? ` · Viewed ${link.access_count}×` : ''}
+            </div>
+          </div>
+          ${!inactive ? `<button class="btn small danger" onclick="revokeShareLink(${link.id})">Revoke</button>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<p style="color:#dc2626; font-size:13px;">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function generateShareLink() {
+  const label = document.getElementById('share-label').value.trim();
+  const expiresInDays = document.getElementById('share-expires').value;
+
+  try {
+    const res = await fetch(`/api/clients/${shareClientId}/share-links`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label || null, expiresInDays: expiresInDays || null })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create share link');
+    }
+    const { shareUrl } = await res.json();
+    const fullUrl = `${window.location.origin}${shareUrl}`;
+
+    // Copy to clipboard for convenience; the raw token is only ever
+    // available in this response, so surface it clearly.
+    try { await navigator.clipboard.writeText(fullUrl); } catch (_) { /* clipboard may be unavailable */ }
+    alert(`Share link created and copied to your clipboard:\n\n${fullUrl}\n\nThis is the only time the full link will be shown — save it now.`);
+
+    document.getElementById('share-label').value = '';
+    document.getElementById('share-expires').value = '';
+    await loadShareLinks();
+  } catch (err) {
+    alert(err.message || 'Failed to create share link');
+  }
+}
+
+async function revokeShareLink(linkId) {
+  if (!confirm('Revoke this link? Anyone using it will immediately lose access.')) return;
+  try {
+    const res = await fetch(`/api/clients/${shareClientId}/share-links/${linkId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to revoke link');
+    await loadShareLinks();
+  } catch (err) {
+    alert(err.message || 'Failed to revoke link');
+  }
 }
 
 // Initialize - loadClients() is now called from auth.js after authentication check

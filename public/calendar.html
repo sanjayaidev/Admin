@@ -12,13 +12,13 @@
 
   <nav class="navbar">
     <span class="brand">ClientPM</span>
-    <a href="/">Dashboard</a>
-    <a href="/clients.html">Clients</a>
+    <a href="/" data-role="admin">Dashboard</a>
+    <a href="/clients.html" data-role="admin">Clients</a>
     <a href="/tasks.html">Tasks</a>
-    <a href="/invoices.html">Invoices</a>
+    <a href="/invoices.html" data-role="admin">Invoices</a>
     <a href="/calendar.html" class="active">Calendar</a>
-    <a href="/team.html">Team</a>
-    <a href="/settings.html">Settings</a>
+    <a href="/team.html" data-role="admin">Team</a>
+    <a href="/settings.html" data-role="admin">Settings</a>
     <a href="/profile.html">Profile</a>
   </nav>
 
@@ -28,12 +28,12 @@
         <h1>Calendar</h1>
         <p id="event-count">Loading...</p>
       </div>
-      <button class="btn" onclick="openCreateModal()">+ Add Event</button>
+      <button class="btn" onclick="openCreateModal()" data-role="admin">+ Add Event</button>
     </div>
 
     <!-- Filters -->
     <div class="filters-bar" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:center;">
-      <select id="filter-client" onchange="loadEvents()">
+      <select id="filter-client" onchange="loadEvents()" data-role="admin">
         <option value="">All Clients</option>
       </select>
       <select id="filter-type" onchange="render()">

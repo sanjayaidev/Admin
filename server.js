@@ -27,7 +27,7 @@ const {
   updateJoinRequestStatus,
   getUserPendingJoinRequest
 } = require('./lib/auth');
-const { requireAuth, requireRole, optionalAuth } = require('./middleware/auth');
+const { requireAuth, requireRole, requireAdmin, optionalAuth } = require('./middleware/auth');
 const {
   createInvoiceFromTasks,
   updateInvoiceDraft,
@@ -36,6 +36,8 @@ const {
   generateInvoiceHTML,
   markInvoicePaid
 } = require('./lib/payment/invoice');
+const { createShareLink, listShareLinks, revokeShareLink, resolveShareToken } = require('./lib/shareLinks');
+const rateLimit = require('express-rate-limit');
 
 // ── Google Modules Integration (Flow Builder) ─────────────────────────────────
 // Mount the modules API routes for Gmail, Calendar, Sheets, Docs, Drive, Forms, GBP
@@ -80,21 +82,50 @@ app.use(cors({
   credentials: true
 }));
 
+// Slows down credential stuffing / brute-force login attempts. Keyed by IP
+// since these routes run before a session exists.
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again later.' }
+});
+
+// The public client-dashboard share endpoint has no login wall by design,
+// so it gets its own (more generous, since a real client may refresh a lot)
+// limiter to slow down anyone trying to brute-force share tokens.
+const shareRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' }
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTH ROUTES  (public — no requireAuth)
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: 'Email and password are required' });
 
-    const user = await authenticateUser(email, password);
-    if (!user)
+    const result = await authenticateUser(email, password);
+
+    if (result.status === 'invalid')
       return res.status(401).json({ error: 'Invalid email or password' });
 
+    if (result.status === 'pending_activation')
+      return res.status(403).json({
+        error: 'Your account is pending activation by an admin. Please contact your organization admin.',
+        code: 'PENDING_ACTIVATION'
+      });
+
+    const user = result.user;
     const token = await createSession(user.id);
     res.cookie('session_token', token, {
       httpOnly: true,
@@ -110,7 +141,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Signup - Two paths: Create Org (Admin) or Join Org (Team, pending approval)
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', authRateLimiter, async (req, res) => {
   try {
     const { fullName, email, password, orgId, orgSlug, orgName, mode } = req.body;
     if (!fullName || !email || !password)
@@ -329,20 +360,34 @@ app.get('/api/auth/validate-org-slug', async (req, res) => {
   }
 });
 
-// Share link — public, no auth (must be before requireAuth middleware)
-app.get('/api/share/:slug', optionalAuth, async (req, res) => {
+// Client dashboard share link — public, no auth (must be before requireAuth
+// middleware below). Access is gated entirely by possession of a
+// high-entropy token (see lib/shareLinks.js), not by guessing a client's
+// name-derived slug. The token resolves to exactly one org+client pair, so
+// no query parameter can widen access to other clients or organizations.
+// This endpoint is intentionally read-only: no route exists that accepts a
+// share token and mutates anything.
+app.get('/api/public/share/:token', shareRateLimiter, async (req, res) => {
   try {
     await migrate();
-    const { slug } = req.params;
-    const { start_date, end_date, status } = req.query;
+    const resolved = await resolveShareToken(req.params.token);
+    if (!resolved) return res.status(404).json({ error: 'This share link is invalid, expired, or has been revoked.' });
+    const { orgId, clientId } = resolved;
 
-    const { rows: clientRows } = await pool.query('SELECT * FROM clients WHERE slug = $1', [slug]);
+    const { rows: clientRows } = await pool.query(
+      'SELECT id, name, email, phone, company FROM clients WHERE id = $1 AND org_id = $2',
+      [clientId, orgId]
+    );
     if (clientRows.length === 0) return res.status(404).json({ error: 'Client not found' });
     const client = clientRows[0];
 
-    let query = 'SELECT * FROM work_items WHERE client_id = $1';
-    const params = [client.id];
-    let i = 2;
+    const { start_date, end_date, status } = req.query;
+    let query = `
+      SELECT id, title, description, status, priority, due_date, amount, payment_status, created_at
+      FROM work_items WHERE client_id = $1 AND org_id = $2
+    `;
+    const params = [clientId, orgId];
+    let i = 3;
     if (start_date) { query += ` AND due_date >= $${i++}`; params.push(start_date); }
     if (end_date)   { query += ` AND due_date <= $${i++}`; params.push(end_date); }
     if (status)     { query += ` AND status = $${i++}`;    params.push(status); }
@@ -489,29 +534,18 @@ app.put('/api/profile/notifications', async (req, res) => {
 
 
 // ── Clients ────────────────────────────────────────────────────────────────────
+// Admin-only: team members are scoped to viewing their own assigned tasks
+// and calendar events only (see Work Items / Calendar Events below), and do
+// not get client-management access.
 
-// GET all clients (scoped by org and role)
-app.get('/api/clients', async (req, res) => {
+// GET all clients (org scoped)
+app.get('/api/clients', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
-    let query, params = [];
-    let i = 1;
-    
-    // Always filter by organization
-    query = 'SELECT * FROM clients WHERE org_id = $' + i++;
-    params.push(req.user.orgId);
-    
-    if (req.user.role !== 'admin') {
-      query += ` AND id IN (
-        SELECT DISTINCT c.id FROM clients c
-        INNER JOIN work_items w ON w.client_id = c.id
-        WHERE w.assigned_to = $${i++}
-      )`;
-      params.push(req.user.id);
-    }
-    
-    query += ' ORDER BY created_at DESC';
-    const { rows } = await pool.query(query, params);
+    const { rows } = await pool.query(
+      'SELECT * FROM clients WHERE org_id = $1 ORDER BY created_at DESC',
+      [req.user.org_id]
+    );
     res.json(rows);
   } catch (err) {
     console.error('Error fetching clients:', err);
@@ -520,7 +554,7 @@ app.get('/api/clients', async (req, res) => {
 });
 
 // POST create client
-app.post('/api/clients', async (req, res) => {
+app.post('/api/clients', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { name, email, phone, company, address, notes } = req.body;
@@ -530,7 +564,7 @@ app.post('/api/clients', async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO clients (name, email, phone, company, address, notes, slug, created_by, org_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, slug, req.user.id, req.user.orgId]
+      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, slug, req.user.id, req.user.org_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -539,11 +573,11 @@ app.post('/api/clients', async (req, res) => {
   }
 });
 
-// GET single client
-app.get('/api/clients/:id', async (req, res) => {
+// GET single client (org scoped)
+app.get('/api/clients/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
-    const { rows } = await pool.query('SELECT * FROM clients WHERE id=$1', [req.params.id]);
+    const { rows } = await pool.query('SELECT * FROM clients WHERE id=$1 AND org_id=$2', [req.params.id, req.user.org_id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Client not found' });
     res.json(rows[0]);
   } catch (err) {
@@ -552,8 +586,8 @@ app.get('/api/clients/:id', async (req, res) => {
   }
 });
 
-// PUT update client
-app.put('/api/clients/:id', async (req, res) => {
+// PUT update client (org scoped)
+app.put('/api/clients/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { name, email, phone, company, address, notes } = req.body;
@@ -561,8 +595,8 @@ app.put('/api/clients/:id', async (req, res) => {
 
     const { rows } = await pool.query(
       `UPDATE clients SET name=$1,email=$2,phone=$3,company=$4,address=$5,notes=$6,updated_at=CURRENT_TIMESTAMP
-       WHERE id=$7 RETURNING *`,
-      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, req.params.id]
+       WHERE id=$7 AND org_id=$8 RETURNING *`,
+      [name.trim(), email||null, phone||null, company||null, address||null, notes||null, req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Client not found' });
     res.json(rows[0]);
@@ -572,11 +606,11 @@ app.put('/api/clients/:id', async (req, res) => {
   }
 });
 
-// DELETE client (admin only)
+// DELETE client (admin only, org scoped)
 app.delete('/api/clients/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
-    const { rows } = await pool.query('DELETE FROM clients WHERE id=$1 RETURNING id', [req.params.id]);
+    const { rows } = await pool.query('DELETE FROM clients WHERE id=$1 AND org_id=$2 RETURNING id', [req.params.id, req.user.org_id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Client not found' });
     res.json({ deleted: true });
   } catch (err) {
@@ -585,9 +619,65 @@ app.delete('/api/clients/:id', requireRole(['admin']), async (req, res) => {
   }
 });
 
-// ── Work Items ─────────────────────────────────────────────────────────────────
+// ── Client Dashboard Share Links (admin only) ──────────────────────────────────
+// Lets an admin generate a secure, revocable, read-only link they can hand
+// to a client so the client can view their own work dashboard (adjusting
+// the date range themselves) without any login or edit access. See
+// lib/shareLinks.js and the public GET /api/public/share/:token endpoint.
 
-// GET all work items (scoped by org and role)
+// POST create a new share link for a client
+app.post('/api/clients/:id/share-links', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const clientCheck = await pool.query('SELECT id FROM clients WHERE id=$1 AND org_id=$2', [req.params.id, req.user.org_id]);
+    if (clientCheck.rows.length === 0) return res.status(404).json({ error: 'Client not found' });
+
+    const { label, expiresInDays } = req.body || {};
+    const { token, link } = await createShareLink(req.user.org_id, req.params.id, req.user.id, { label, expiresInDays });
+
+    // The raw token is only ever returned here, at creation time.
+    res.status(201).json({
+      ...link,
+      token,
+      shareUrl: `/share/${token}`
+    });
+  } catch (err) {
+    console.error('Error creating share link:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET list share links for a client (never includes the raw token)
+app.get('/api/clients/:id/share-links', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const clientCheck = await pool.query('SELECT id FROM clients WHERE id=$1 AND org_id=$2', [req.params.id, req.user.org_id]);
+    if (clientCheck.rows.length === 0) return res.status(404).json({ error: 'Client not found' });
+
+    const links = await listShareLinks(req.user.org_id, req.params.id);
+    res.json(links);
+  } catch (err) {
+    console.error('Error listing share links:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE revoke a share link
+app.delete('/api/clients/:id/share-links/:linkId', requireRole(['admin']), async (req, res) => {
+  try {
+    await migrate();
+    const revoked = await revokeShareLink(req.user.org_id, req.params.id, req.params.linkId);
+    if (!revoked) return res.status(404).json({ error: 'Share link not found or already revoked' });
+    res.json({ revoked: true });
+  } catch (err) {
+    console.error('Error revoking share link:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Work Items (Tasks) ─────────────────────────────────────────────────────────
+
+// GET all work items (org scoped; team members see only their own)
 app.get('/api/work-items', async (req, res) => {
   try {
     await migrate();
@@ -601,7 +691,7 @@ app.get('/api/work-items', async (req, res) => {
       LEFT JOIN users u ON u.id = w.assigned_to
       WHERE w.org_id = $1
     `;
-    const params = [req.user.orgId];
+    const params = [req.user.org_id];
     let i = 2;
 
     if (req.user.role !== 'admin') {
@@ -622,8 +712,8 @@ app.get('/api/work-items', async (req, res) => {
   }
 });
 
-// POST create work item
-app.post('/api/work-items', async (req, res) => {
+// POST create work item (admin only — team members don't create/assign tasks)
+app.post('/api/work-items', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = req.body;
@@ -633,7 +723,7 @@ app.post('/api/work-items', async (req, res) => {
       `INSERT INTO work_items (client_id,title,description,status,priority,due_date,amount,payment_status,assigned_to,created_by,org_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [client_id, title.trim(), description||null, status||'pending', priority||'medium',
-       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.user.id, req.user.orgId]
+       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.user.id, req.user.org_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -642,17 +732,20 @@ app.post('/api/work-items', async (req, res) => {
   }
 });
 
-// GET single work item
+// GET single work item (org scoped; team members can only view their own)
 app.get('/api/work-items/:id', async (req, res) => {
   try {
     await migrate();
     const { rows } = await pool.query(
       `SELECT w.*, c.name AS client_name, c.slug AS client_slug
        FROM work_items w LEFT JOIN clients c ON c.id = w.client_id
-       WHERE w.id = $1`,
-      [req.params.id]
+       WHERE w.id = $1 AND w.org_id = $2`,
+      [req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
+    if (req.user.role !== 'admin' && rows[0].assigned_to !== req.user.id) {
+      return res.status(403).json({ error: 'You can only view tasks assigned to you' });
+    }
     res.json(rows[0]);
   } catch (err) {
     console.error('Error fetching work item:', err);
@@ -660,8 +753,9 @@ app.get('/api/work-items/:id', async (req, res) => {
   }
 });
 
-// PUT update work item
-app.put('/api/work-items/:id', async (req, res) => {
+// PUT full update of a work item (admin only — team members may only mark
+// their own tasks complete/incomplete via the dedicated endpoint below)
+app.put('/api/work-items/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { client_id, title, description, status, priority, due_date, amount, payment_status, assigned_to } = req.body;
@@ -669,9 +763,9 @@ app.put('/api/work-items/:id', async (req, res) => {
       `UPDATE work_items
        SET client_id=$1,title=$2,description=$3,status=$4,priority=$5,due_date=$6,
            amount=$7,payment_status=$8,assigned_to=$9,updated_at=CURRENT_TIMESTAMP
-       WHERE id=$10 RETURNING *`,
+       WHERE id=$10 AND org_id=$11 RETURNING *`,
       [client_id, title.trim(), description||null, status||'pending', priority||'medium',
-       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.params.id]
+       due_date||null, amount||null, payment_status||'unpaid', assigned_to||null, req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
     res.json(rows[0]);
@@ -681,11 +775,43 @@ app.put('/api/work-items/:id', async (req, res) => {
   }
 });
 
-// DELETE work item (admin only)
+// PATCH mark own task complete / not complete — the ONLY write access a team
+// member has to a work item. Every other field (client, title, amount,
+// assignment, due date, payment status, ...) stays admin-only via PUT above.
+app.patch('/api/work-items/:id/complete', async (req, res) => {
+  try {
+    await migrate();
+    const { completed } = req.body;
+    if (typeof completed !== 'boolean')
+      return res.status(400).json({ error: '`completed` (boolean) is required' });
+
+    const existing = await pool.query(
+      'SELECT id, assigned_to FROM work_items WHERE id=$1 AND org_id=$2',
+      [req.params.id, req.user.org_id]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
+
+    const isOwner = existing.rows[0].assigned_to === req.user.id;
+    if (req.user.role !== 'admin' && !isOwner)
+      return res.status(403).json({ error: 'You can only update tasks assigned to you' });
+
+    const { rows } = await pool.query(
+      `UPDATE work_items SET status=$1, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$2 AND org_id=$3 RETURNING *`,
+      [completed ? 'completed' : 'pending', req.params.id, req.user.org_id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating task completion:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE work item (admin only, org scoped)
 app.delete('/api/work-items/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
-    const { rows } = await pool.query('DELETE FROM work_items WHERE id=$1 RETURNING id', [req.params.id]);
+    const { rows } = await pool.query('DELETE FROM work_items WHERE id=$1 AND org_id=$2 RETURNING id', [req.params.id, req.user.org_id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
     res.json({ deleted: true });
   } catch (err) {
@@ -695,6 +821,8 @@ app.delete('/api/work-items/:id', requireRole(['admin']), async (req, res) => {
 });
 
 // ── Calendar Events ────────────────────────────────────────────────────────────
+// Team members: read-only, and only their own events. Admins: full control
+// over any event within their organization.
 
 app.get('/api/calendar-events', async (req, res) => {
   try {
@@ -704,11 +832,20 @@ app.get('/api/calendar-events', async (req, res) => {
       SELECT e.*, w.title AS work_item_title, w.client_id
       FROM calendar_events e
       LEFT JOIN work_items w ON w.id = e.work_item_id
-      WHERE 1=1
+      WHERE e.org_id = $1
     `;
-    const params = [];
-    let i = 1;
-    if (user_id)      { query += ` AND e.user_id = $${i++}`;       params.push(user_id); }
+    const params = [req.user.org_id];
+    let i = 2;
+
+    if (req.user.role !== 'admin') {
+      // Team members can only ever see their own events, regardless of
+      // what user_id they pass in the query string.
+      query += ` AND e.user_id = $${i++}`;
+      params.push(req.user.id);
+    } else if (user_id) {
+      query += ` AND e.user_id = $${i++}`;
+      params.push(user_id);
+    }
     if (work_item_id) { query += ` AND e.work_item_id = $${i++}`;  params.push(work_item_id); }
     if (start_date)   { query += ` AND e.event_date >= $${i++}`;   params.push(start_date); }
     if (end_date)     { query += ` AND e.event_date <= $${i++}`;   params.push(end_date); }
@@ -721,17 +858,20 @@ app.get('/api/calendar-events', async (req, res) => {
   }
 });
 
-app.post('/api/calendar-events', async (req, res) => {
+app.post('/api/calendar-events', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { work_item_id, user_id, title, description, event_date, event_type, external_calendar_id } = req.body;
     if (!user_id || !title || !event_date)
       return res.status(400).json({ error: 'user_id, title, and event_date are required' });
 
+    const targetUser = await pool.query('SELECT id FROM users WHERE id=$1 AND org_id=$2', [user_id, req.user.org_id]);
+    if (targetUser.rows.length === 0) return res.status(400).json({ error: 'Invalid user_id for this organization' });
+
     const { rows } = await pool.query(
-      `INSERT INTO calendar_events (work_item_id,user_id,title,description,event_date,event_type,external_calendar_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [work_item_id||null, user_id, title.trim(), description||null, event_date, event_type||'task', external_calendar_id||null]
+      `INSERT INTO calendar_events (work_item_id,user_id,title,description,event_date,event_type,external_calendar_id,org_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [work_item_id||null, user_id, title.trim(), description||null, event_date, event_type||'task', external_calendar_id||null, req.user.org_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -740,15 +880,19 @@ app.post('/api/calendar-events', async (req, res) => {
   }
 });
 
-app.put('/api/calendar-events/:id', async (req, res) => {
+app.put('/api/calendar-events/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { work_item_id, user_id, title, description, event_date, event_type } = req.body;
+
+    const targetUser = await pool.query('SELECT id FROM users WHERE id=$1 AND org_id=$2', [user_id, req.user.org_id]);
+    if (targetUser.rows.length === 0) return res.status(400).json({ error: 'Invalid user_id for this organization' });
+
     const { rows } = await pool.query(
       `UPDATE calendar_events
        SET work_item_id=$1,user_id=$2,title=$3,description=$4,event_date=$5,event_type=$6
-       WHERE id=$7 RETURNING *`,
-      [work_item_id||null, user_id, title.trim(), description||null, event_date, event_type||'task', req.params.id]
+       WHERE id=$7 AND org_id=$8 RETURNING *`,
+      [work_item_id||null, user_id, title.trim(), description||null, event_date, event_type||'task', req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Event not found' });
     res.json(rows[0]);
@@ -758,10 +902,10 @@ app.put('/api/calendar-events/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/calendar-events/:id', async (req, res) => {
+app.delete('/api/calendar-events/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
-    const { rows } = await pool.query('DELETE FROM calendar_events WHERE id=$1 RETURNING id', [req.params.id]);
+    const { rows } = await pool.query('DELETE FROM calendar_events WHERE id=$1 AND org_id=$2 RETURNING id', [req.params.id, req.user.org_id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Event not found' });
     res.json({ deleted: true });
   } catch (err) {
@@ -770,20 +914,27 @@ app.delete('/api/calendar-events/:id', async (req, res) => {
   }
 });
 
-// ── Work Comments ──────────────────────────────────────────────────────────────
+// ── Work Comments (admin only) ─────────────────────────────────────────────────
+// Team members' only write access anywhere in the system is the task
+// completion toggle above; internal collaboration notes on a task are an
+// admin tool.
 
-app.get('/api/work-comments', async (req, res) => {
+app.get('/api/work-comments', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { work_item_id } = req.query;
-    let query = `
-      SELECT c.*, u.full_name AS user_name FROM work_comments c
-      LEFT JOIN users u ON u.id = c.user_id WHERE 1=1
-    `;
-    const params = [];
-    if (work_item_id) { query += ' AND c.work_item_id = $1'; params.push(work_item_id); }
-    query += ' ORDER BY c.created_at ASC';
-    const { rows } = await pool.query(query, params);
+    if (!work_item_id) return res.status(400).json({ error: 'work_item_id is required' });
+
+    const owned = await pool.query('SELECT id FROM work_items WHERE id=$1 AND org_id=$2', [work_item_id, req.user.org_id]);
+    if (owned.rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
+
+    const { rows } = await pool.query(
+      `SELECT c.*, u.full_name AS user_name FROM work_comments c
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.work_item_id = $1
+       ORDER BY c.created_at ASC`,
+      [work_item_id]
+    );
     res.json(rows);
   } catch (err) {
     console.error('Error fetching comments:', err);
@@ -791,12 +942,15 @@ app.get('/api/work-comments', async (req, res) => {
   }
 });
 
-app.post('/api/work-comments', async (req, res) => {
+app.post('/api/work-comments', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { work_item_id, comment } = req.body;
     if (!work_item_id || !comment)
       return res.status(400).json({ error: 'work_item_id and comment are required' });
+
+    const owned = await pool.query('SELECT id FROM work_items WHERE id=$1 AND org_id=$2', [work_item_id, req.user.org_id]);
+    if (owned.rows.length === 0) return res.status(404).json({ error: 'Work item not found' });
 
     const { rows } = await pool.query(
       `INSERT INTO work_comments (work_item_id,user_id,comment) VALUES ($1,$2,$3) RETURNING *`,
@@ -809,30 +963,30 @@ app.post('/api/work-comments', async (req, res) => {
   }
 });
 
-// ── Dashboard ──────────────────────────────────────────────────────────────────
+// ── Dashboard (admin only — financial/aggregate data) ──────────────────────────
 
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { client_id, start_date, end_date } = req.query;
 
-    let where = 'WHERE 1=1';
-    const params = [];
-    let i = 1;
+    let where = 'WHERE w.org_id = $1';
+    const params = [req.user.org_id];
+    let i = 2;
     if (client_id)  { where += ` AND w.client_id = $${i++}`;  params.push(client_id); }
     if (start_date) { where += ` AND w.due_date >= $${i++}`;  params.push(start_date); }
     if (end_date)   { where += ` AND w.due_date <= $${i++}`;  params.push(end_date); }
 
     const [statusRes, paymentRes, overdueRes, recentRes] = await Promise.all([
-      pool.query(`SELECT status, COUNT(*) as count FROM work_items ${where} GROUP BY status`, params),
+      pool.query(`SELECT status, COUNT(*) as count FROM work_items w ${where} GROUP BY status`, params),
       pool.query(`SELECT
         COALESCE(SUM(amount),0) as total,
         COALESCE(SUM(CASE WHEN payment_status='paid' THEN amount ELSE 0 END),0) as paid,
         COALESCE(SUM(CASE WHEN payment_status!='paid' THEN amount ELSE 0 END),0) as outstanding
-        FROM work_items ${where}`, params),
+        FROM work_items w ${where}`, params),
       pool.query(`SELECT w.*, c.name AS client_name, c.slug AS client_slug
         FROM work_items w LEFT JOIN clients c ON c.id=w.client_id
-        ${where.replace('WHERE 1=1', "WHERE 1=1 AND w.status!='completed' AND w.due_date<CURRENT_DATE")}
+        ${where} AND w.status!='completed' AND w.due_date<CURRENT_DATE
         ORDER BY w.due_date ASC`, params),
       pool.query(`SELECT w.*, c.name AS client_name, c.slug AS client_slug
         FROM work_items w LEFT JOIN clients c ON c.id=w.client_id
@@ -856,12 +1010,14 @@ app.get('/api/dashboard', async (req, res) => {
 
 // ── Team Members ───────────────────────────────────────────────────────────────
 
-// GET all team members
-app.get('/api/team/members', async (req, res) => {
+// GET all team members (scoped to the caller's organization)
+// GET all team members (admin only — org scoped)
+app.get('/api/team/members', requireRole(['admin']), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT id, full_name, email, phone, role, custom_role, avatar, is_active, created_at
-       FROM users ORDER BY created_at DESC`
+       FROM users WHERE org_id = $1 ORDER BY created_at DESC`,
+      [req.user.org_id]
     );
     res.json(rows);
   } catch (err) {
@@ -883,10 +1039,10 @@ app.post('/api/team/members', requireRole(['admin']), async (req, res) => {
 
     const tempPassword = password || Math.random().toString(36).slice(-8);
     const { rows } = await pool.query(
-      `INSERT INTO users (full_name,email,phone,role,custom_role,password_hash)
-       VALUES ($1,$2,$3,$4,$5,crypt($6,gen_salt('bf')))
+      `INSERT INTO users (full_name,email,phone,role,custom_role,password_hash,org_id,org_slug)
+       VALUES ($1,$2,$3,$4,$5,crypt($6,gen_salt('bf')),$7,$8)
        RETURNING id, full_name, email, phone, role, custom_role, avatar, is_active, created_at`,
-      [full_name, email, phone||null, role, custom_role||null, tempPassword]
+      [full_name, email, phone||null, role, custom_role||null, tempPassword, req.user.org_id, req.user.orgSlug]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -910,14 +1066,14 @@ app.put('/api/team/members/:id', requireRole(['admin']), async (req, res) => {
     let query, params;
     if (password) {
       query = `UPDATE users SET full_name=$1,email=$2,phone=$3,role=$4,custom_role=$5,
-               password_hash=crypt($6,gen_salt('bf')) WHERE id=$7
+               password_hash=crypt($6,gen_salt('bf')) WHERE id=$7 AND org_id=$8
                RETURNING id, full_name, email, phone, role, custom_role, avatar, is_active, created_at`;
-      params = [full_name, email, phone||null, role, custom_role||null, password, id];
+      params = [full_name, email, phone||null, role, custom_role||null, password, id, req.user.org_id];
     } else {
       query = `UPDATE users SET full_name=$1,email=$2,phone=$3,role=$4,custom_role=$5
-               WHERE id=$6
+               WHERE id=$6 AND org_id=$7
                RETURNING id, full_name, email, phone, role, custom_role, avatar, is_active, created_at`;
-      params = [full_name, email, phone||null, role, custom_role||null, id];
+      params = [full_name, email, phone||null, role, custom_role||null, id, req.user.org_id];
     }
 
     const { rows } = await pool.query(query, params);
@@ -936,7 +1092,7 @@ app.delete('/api/team/members/:id', requireRole(['admin']), async (req, res) => 
     if (parseInt(id) === req.user.id)
       return res.status(400).json({ error: 'Cannot delete your own account' });
 
-    const { rowCount } = await pool.query('DELETE FROM users WHERE id=$1', [id]);
+    const { rowCount } = await pool.query('DELETE FROM users WHERE id=$1 AND org_id=$2', [id, req.user.org_id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Member not found' });
     res.json({ success: true });
   } catch (err) {
@@ -950,9 +1106,9 @@ app.put('/api/team/members/:id/status', requireRole(['admin']), async (req, res)
   try {
     const { is_active } = req.body;
     const { rows } = await pool.query(
-      `UPDATE users SET is_active=$1 WHERE id=$2
+      `UPDATE users SET is_active=$1 WHERE id=$2 AND org_id=$3
        RETURNING id, full_name, email, phone, role, custom_role, avatar, is_active, created_at`,
-      [is_active, req.params.id]
+      [is_active, req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Member not found' });
     res.json(rows[0]);
@@ -962,8 +1118,8 @@ app.put('/api/team/members/:id/status', requireRole(['admin']), async (req, res)
   }
 });
 
-// GET workload distribution
-app.get('/api/team/workload', async (req, res) => {
+// GET workload distribution (admin only, org scoped)
+app.get('/api/team/workload', requireRole(['admin']), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT u.id AS user_id, u.full_name AS member_name,
@@ -972,11 +1128,11 @@ app.get('/api/team/workload', async (req, res) => {
         COUNT(CASE WHEN w.status='in-progress' THEN 1 END) AS in_progress,
         COUNT(CASE WHEN w.status='completed'   THEN 1 END) AS completed
       FROM users u
-      LEFT JOIN work_items w ON w.assigned_to = u.id
-      WHERE u.role IN ('admin','team')
+      LEFT JOIN work_items w ON w.assigned_to = u.id AND w.org_id = u.org_id
+      WHERE u.role IN ('admin','team') AND u.org_id = $1
       GROUP BY u.id, u.full_name
       ORDER BY task_count DESC
-    `);
+    `, [req.user.org_id]);
     res.json(rows);
   } catch (err) {
     console.error('Error fetching workload:', err);
@@ -987,9 +1143,11 @@ app.get('/api/team/workload', async (req, res) => {
 // ── Custom Roles ───────────────────────────────────────────────────────────────
 
 // GET all roles
-app.get('/api/roles', async (req, res) => {
+// ── Custom Roles (admin only, org scoped) ───────────────────────────────────────
+
+app.get('/api/roles', requireRole(['admin']), async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM roles ORDER BY name ASC');
+    const { rows } = await pool.query('SELECT * FROM roles WHERE org_id = $1 ORDER BY name ASC', [req.user.org_id]);
     res.json(rows);
   } catch (err) {
     console.error('Error fetching roles:', err);
@@ -1004,8 +1162,8 @@ app.post('/api/roles', requireRole(['admin']), async (req, res) => {
     if (!name?.trim()) return res.status(400).json({ error: 'Role name is required' });
 
     const { rows } = await pool.query(
-      `INSERT INTO roles (name,description,color,created_by) VALUES ($1,$2,$3,$4) RETURNING *`,
-      [name.trim(), description||null, color||'#4f46e5', req.user.id]
+      `INSERT INTO roles (name,description,color,created_by,org_id) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [name.trim(), description||null, color||'#4f46e5', req.user.id, req.user.org_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -1015,15 +1173,15 @@ app.post('/api/roles', requireRole(['admin']), async (req, res) => {
   }
 });
 
-// PUT update role (admin only)
+// PUT update role (admin only, org scoped)
 app.put('/api/roles/:id', requireRole(['admin']), async (req, res) => {
   try {
     const { name, description, color } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Role name is required' });
 
     const { rows } = await pool.query(
-      `UPDATE roles SET name=$1,description=$2,color=$3 WHERE id=$4 RETURNING *`,
-      [name.trim(), description||null, color||'#4f46e5', req.params.id]
+      `UPDATE roles SET name=$1,description=$2,color=$3 WHERE id=$4 AND org_id=$5 RETURNING *`,
+      [name.trim(), description||null, color||'#4f46e5', req.params.id, req.user.org_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Role not found' });
     res.json(rows[0]);
@@ -1034,16 +1192,18 @@ app.put('/api/roles/:id', requireRole(['admin']), async (req, res) => {
   }
 });
 
-// DELETE role (admin only)
+// DELETE role (admin only, org scoped)
 app.delete('/api/roles/:id', requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
+    const roleCheck = await pool.query('SELECT name FROM roles WHERE id=$1 AND org_id=$2', [id, req.user.org_id]);
+    if (roleCheck.rows.length === 0) return res.status(404).json({ error: 'Role not found' });
+
     await pool.query(
-      `UPDATE users SET custom_role=NULL WHERE custom_role=(SELECT name FROM roles WHERE id=$1)`,
-      [id]
+      `UPDATE users SET custom_role=NULL WHERE custom_role=$1 AND org_id=$2`,
+      [roleCheck.rows[0].name, req.user.org_id]
     );
-    const { rowCount } = await pool.query('DELETE FROM roles WHERE id=$1', [id]);
-    if (rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    await pool.query('DELETE FROM roles WHERE id=$1 AND org_id=$2', [id, req.user.org_id]);
     res.json({ success: true });
   } catch (err) {
     console.error('Error deleting role:', err);
@@ -1151,7 +1311,7 @@ app.get('/api/org/my-join-request', requireAuth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // GET all invoices (scoped by org)
-app.get('/api/invoices', async (req, res) => {
+app.get('/api/invoices', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { status, client_id } = req.query;
@@ -1179,7 +1339,7 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 // GET billable work items for a client — used by the invoice designer to show what can be billed
-app.get('/api/invoices/billable-items/:clientId', async (req, res) => {
+app.get('/api/invoices/billable-items/:clientId', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { rows } = await pool.query(
@@ -1197,7 +1357,7 @@ app.get('/api/invoices/billable-items/:clientId', async (req, res) => {
 
 // POST live preview — calculates totals and renders invoice HTML WITHOUT saving anything.
 // This is what powers the "design it before you commit" experience.
-app.post('/api/invoices/preview', async (req, res) => {
+app.post('/api/invoices/preview', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { clientId, workItemIds = [], customItems = [], taxRate, notes, issueDate, dueDate } = req.body;
@@ -1208,8 +1368,11 @@ app.post('/api/invoices/preview', async (req, res) => {
 
     let workItems = [];
     if (workItemIds.length > 0) {
-      const placeholders = workItemIds.map((_, i) => `$${i + 1}`).join(',');
-      const wiRes = await pool.query(`SELECT * FROM work_items WHERE id IN (${placeholders})`, workItemIds);
+      const placeholders = workItemIds.map((_, i) => `$${i + 2}`).join(',');
+      const wiRes = await pool.query(
+        `SELECT * FROM work_items WHERE id IN (${placeholders}) AND org_id = $1`,
+        [req.user.orgId, ...workItemIds]
+      );
       workItems = wiRes.rows;
     }
 
@@ -1238,7 +1401,7 @@ app.post('/api/invoices/preview', async (req, res) => {
 });
 
 // POST create invoice (always starts as draft — sending is a separate, deliberate step)
-app.post('/api/invoices', async (req, res) => {
+app.post('/api/invoices', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const { clientId, workItemIds = [], customItems = [], taxRate, notes, issueDate, dueDate } = req.body;
@@ -1260,7 +1423,7 @@ app.post('/api/invoices', async (req, res) => {
 });
 
 // GET single invoice with full details
-app.get('/api/invoices/:id', async (req, res) => {
+app.get('/api/invoices/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
@@ -1275,7 +1438,7 @@ app.get('/api/invoices/:id', async (req, res) => {
 });
 
 // GET rendered invoice HTML (for preview / printing a saved invoice)
-app.get('/api/invoices/:id/html', async (req, res) => {
+app.get('/api/invoices/:id/html', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
@@ -1290,7 +1453,7 @@ app.get('/api/invoices/:id/html', async (req, res) => {
 });
 
 // PUT update a draft invoice (line items, dates, notes, tax rate) — recalculates totals
-app.put('/api/invoices/:id', async (req, res) => {
+app.put('/api/invoices/:id', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
@@ -1308,7 +1471,7 @@ app.put('/api/invoices/:id', async (req, res) => {
 });
 
 // POST send invoice — locks it from further editing and marks linked work items as partially paid
-app.post('/api/invoices/:id/send', async (req, res) => {
+app.post('/api/invoices/:id/send', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const check = await pool.query('SELECT * FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
@@ -1330,7 +1493,7 @@ app.post('/api/invoices/:id/send', async (req, res) => {
 });
 
 // POST mark invoice paid
-app.post('/api/invoices/:id/pay', async (req, res) => {
+app.post('/api/invoices/:id/pay', requireRole(['admin']), async (req, res) => {
   try {
     await migrate();
     const check = await pool.query('SELECT id FROM invoices WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
@@ -1370,7 +1533,7 @@ app.get('/invoices', (req, res) =>
   res.sendFile(path.join(PUBLIC_DIR, 'invoices.html'))
 );
 
-app.get('/share/:slug', (req, res) =>
+app.get('/share/:token', (req, res) =>
   res.sendFile(path.join(PUBLIC_DIR, 'share.html'))
 );
 

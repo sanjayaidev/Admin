@@ -73,7 +73,21 @@ function updateNavbar(user) {
   // Add user info and logout button to navbar
   const navbar = document.querySelector('.navbar');
   if (!navbar) return;
-  
+
+  // Role-based nav: team members only get Tasks / Calendar / Profile.
+  // This is a UI convenience only — the real enforcement is server-side
+  // (every admin-only API route checks the session role independently).
+  const isAdmin = user.role === 'admin';
+  navbar.querySelectorAll('[data-role="admin"]').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+
+  const ADMIN_ONLY_PATHS = ['/', '/index.html', '/clients.html', '/invoices.html', '/team.html', '/settings.html'];
+  if (!isAdmin && ADMIN_ONLY_PATHS.includes(window.location.pathname)) {
+    window.location.href = '/tasks.html';
+    return;
+  }
+
   // Remove existing user section if any
   const existingUser = navbar.querySelector('.navbar-user');
   if (existingUser) {

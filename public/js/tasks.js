@@ -148,7 +148,7 @@ function render() {
             <th>Amount</th>
             <th>Payment</th>
             ${isAdmin ? '<th>Assigned To</th>' : ''}
-            ${isAdmin ? '<th>Actions</th>' : ''}
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -162,6 +162,19 @@ function render() {
 function taskRowHtml(task) {
   const overdueStyle = isOverdue(task) ? 'style="color:#dc2626; font-weight:600;"' : '';
   const assignedName = task.assigned_name || '—';
+  const isComplete = task.status === 'completed';
+
+  const actionsCell = isAdmin
+    ? `<td>
+         <button class="btn outline" style="padding:4px 8px; font-size:12px;" onclick="editTask(${task.id})">Edit</button>
+         <button class="btn danger" style="padding:4px 8px; font-size:12px;" onclick="openDeleteModal(${task.id})">Delete</button>
+       </td>`
+    : `<td>
+         <button class="btn ${isComplete ? 'outline' : ''}" style="padding:4px 8px; font-size:12px;"
+                 onclick="toggleTaskComplete(${task.id}, ${!isComplete})">
+           ${isComplete ? 'Reopen' : 'Mark Complete'}
+         </button>
+       </td>`;
 
   return `
     <tr>
@@ -173,14 +186,30 @@ function taskRowHtml(task) {
       <td>${formatCurrency(task.amount)}</td>
       <td><span class="badge ${task.payment_status}">${task.payment_status}</span></td>
       ${isAdmin ? `<td>${escapeHtml(assignedName)}</td>` : ''}
-      ${isAdmin ? `
-        <td>
-          <button class="btn outline" style="padding:4px 8px; font-size:12px;" onclick="editTask(${task.id})">Edit</button>
-          <button class="btn danger" style="padding:4px 8px; font-size:12px;" onclick="openDeleteModal(${task.id})">Delete</button>
-        </td>
-      ` : ''}
+      ${actionsCell}
     </tr>
   `;
+}
+
+// Team members' only mutation anywhere in the app: toggle their own task's
+// completion status. Every other field is admin-managed. The server
+// independently re-checks ownership (assigned_to) on every call — this
+// button is just the UI affordance.
+async function toggleTaskComplete(id, completed) {
+  try {
+    const res = await fetch(`/api/work-items/${id}/complete`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update task');
+    }
+    await loadTasks();
+  } catch (err) {
+    alert(err.message || 'Failed to update task');
+  }
 }
 
 function clearFilters() {

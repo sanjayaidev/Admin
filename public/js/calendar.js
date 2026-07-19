@@ -7,10 +7,21 @@ let allTasks = [];
 let deleteId = null;
 let currentDate = new Date();
 let currentView = 'month';
+let isAdmin = false;
 
 // Load data on page load
 async function initCalendar() {
-  await Promise.all([loadClients(), loadTasks()]);
+  const authResult = await window.checkAuth();
+  if (!authResult) return;
+  isAdmin = authResult.user.role === 'admin';
+
+  // "Add Event" and the client filter are admin tools — team members only
+  // ever see their own events, read-only.
+  document.querySelectorAll('[data-role="admin"]').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+
+  await Promise.all([isAdmin ? loadClients() : Promise.resolve(), loadTasks()]);
   await loadEvents();
   renderCalendar();
 }
@@ -40,18 +51,15 @@ async function loadTasks() {
 }
 
 async function loadEvents() {
-  const clientId = document.getElementById('filter-client').value;
-  let url = '/api/calendar-events?user_id=1'; // Default user_id=1 for now (no auth)
-  
+  const clientId = isAdmin ? document.getElementById('filter-client').value : '';
+
   if (clientId) {
-    // Get tasks for this client first, then filter events
+    // Admin filtering by client: get tasks for this client first, then their events.
     const taskRes = await fetch(`/api/work-items?client_id=${clientId}`);
     const clientTasks = await taskRes.json();
-    const taskIds = clientTasks.map(t => t.id).join(',');
-    
-    if (taskIds) {
-      // Fetch events for these work items
-      const eventPromises = clientTasks.map(task => 
+
+    if (clientTasks.length > 0) {
+      const eventPromises = clientTasks.map(task =>
         fetch(`/api/calendar-events?work_item_id=${task.id}`).then(r => r.json())
       );
       const eventArrays = await Promise.all(eventPromises);
@@ -60,7 +68,10 @@ async function loadEvents() {
       allEvents = [];
     }
   } else {
-    const res = await fetch(url);
+    // Admins see all of their organization's events; the server
+    // automatically restricts team members to only their own, regardless
+    // of any query params sent here.
+    const res = await fetch('/api/calendar-events');
     allEvents = await res.json();
   }
   
@@ -264,7 +275,7 @@ function eventItemHtml(event) {
         ${event.description ? `<p style="font-size:13px; color:#6b7280; margin-top:4px;">${escapeHtml(event.description)}</p>` : ''}
       </div>
       <div>
-        ${!event.isPendingTask ? `
+        ${(!event.isPendingTask && isAdmin) ? `
         <button class="btn outline" style="padding:4px 8px; font-size:12px;" onclick="editEvent(${event.id})">Edit</button>
         <button class="btn danger" style="padding:4px 8px; font-size:12px;" onclick="openDeleteModal(${event.id})">Delete</button>
         ` : ''}
@@ -316,6 +327,7 @@ function goToToday() {
 
 // Modal functions
 function openCreateModal() {
+  if (!isAdmin) return; // safety guard — backend also rejects this
   document.getElementById('modal-title').textContent = 'Add Event';
   document.getElementById('edit-id').value = '';
   document.getElementById('save-btn').textContent = 'Create';
@@ -331,6 +343,7 @@ function openCreateModal() {
 }
 
 function editEvent(id) {
+  if (!isAdmin) return; // safety guard — backend also rejects this
   const event = allEvents.find(e => e.id == id);
   if (!event) return;
   

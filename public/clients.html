@@ -11,13 +11,13 @@
 <body>
   <nav class="navbar">
     <span class="brand">ClientPM</span>
-    <a href="/">Dashboard</a>
-    <a href="/clients.html" class="active">Clients</a>
+    <a href="/" data-role="admin">Dashboard</a>
+    <a href="/clients.html" class="active" data-role="admin">Clients</a>
     <a href="/tasks.html">Tasks</a>
-    <a href="/invoices.html">Invoices</a>
+    <a href="/invoices.html" data-role="admin">Invoices</a>
     <a href="/calendar.html">Calendar</a>
-    <a href="/team.html">Team</a>
-    <a href="/settings.html">Settings</a>
+    <a href="/team.html" data-role="admin">Team</a>
+    <a href="/settings.html" data-role="admin">Settings</a>
     <a href="/profile.html">Profile</a>
   </nav>
   
@@ -88,6 +88,36 @@
       <div class="modal-actions">
         <button class="btn outline" onclick="closeDeleteModal()">Cancel</button>
         <button class="btn danger" onclick="confirmDelete()">Delete Permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share dashboard modal -->
+  <div class="modal-overlay" id="share-modal">
+    <div class="modal-box" style="max-width: 520px;">
+      <h3>🔗 Share Dashboard — <span id="share-client-name"></span></h3>
+      <p style="font-size: 13px; color: #6b7280; margin: 4px 0 16px;">
+        Anyone with a link below can view this client's tasks and payment
+        summary (they can adjust the date range themselves) — nothing else.
+        No login required, and links can't be used to edit anything.
+        Revoke a link any time to cut off access immediately.
+      </p>
+
+      <div id="share-links-list" style="margin-bottom: 16px;">Loading…</div>
+
+      <div class="field-row" style="align-items: flex-end;">
+        <div>
+          <label>Label (optional)</label>
+          <input id="share-label" type="text" placeholder="e.g. Sent to client on WhatsApp" />
+        </div>
+        <div>
+          <label>Expires in (days, optional)</label>
+          <input id="share-expires" type="number" min="1" placeholder="Never" style="width: 100%;" />
+        </div>
+      </div>
+      <div class="modal-actions" style="justify-content: space-between;">
+        <button class="btn" onclick="generateShareLink()">➕ Generate New Link</button>
+        <button class="btn outline" onclick="closeShareModal()">Close</button>
       </div>
     </div>
   </div>
